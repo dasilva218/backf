@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String          @id @default(uuid())
+  name            String?
+  email           String          @unique
+  emailVerified   Boolean         @default(false)
+  status          AccountStatus   @default(ACTIVE)
+  image           String?
+  role            UserRole        @default(BOUTIQUE)
+  password        String
+  adminProfile    Admin?
+  boutiqueProfile Boutique?
+  livreurProfile  Livreur?
+  notifications   Notification[]
+  supportTickets  SupportTicket[]
+  accounts        Account[]
+  sessions        Session[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("user")
+}
+
+model Admin {
+  id           String        @id @default(uuid())
+  firstname    String
+  lastname     String
+  phoneAirtel  String?
+  phoneMoov    String?
+  userAdminId  String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userAdminId], references: [id], onDelete: Cascade)
+  documents    Document[]
+  gains        Gain[]
+  transactions Transaction[]
+}
+
+model Boutique {
+  id                 String        @id @default(uuid())
+  firstname          String
+  lastname           String
+  phoneAirtel        String?
+  phoneMoov          String?
+  address            String?
+  userBoutiqueId     String        @unique
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  user               User          @relation(fields: [userBoutiqueId], references: [id], onDelete: Cascade)
+  documents          Document[]
+  evaluationsDonnees Evaluation[]  @relation("EvaluationsDonnees")
+  evaluations        Evaluation[]  @relation("EvaluationsRecues")
+  livraisonsSoumise  Livraison[]
+  transactions       Transaction[]
+}
+
+model Livreur {
+  id                 String        @id @default(cuid())
+  firstname          String
+  lastname           String
+  phoneAirtel        String?
+  phoneMoov          String?
+  address            String?
+  userLivreurId      String        @unique
+  moyenTransport     TransportMode
+  immatriculation    String?
+  zoneGeographique   String[]
+  ville              String?
+  scoreGlobal        Float         @default(0)
+  nombreLivraisons   Int           @default(0)
+  estDisponible      Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  documents          Document[]
+  evaluationsDonnees Evaluation[]  @relation("EvaluationsDonnees")
+  evaluations        Evaluation[]  @relation("EvaluationsRecues")
+  gains              Gain[]
+  livraisons         Livraison[]
+  user               User          @relation(fields: [userLivreurId], references: [id], onDelete: Cascade)
+  transactions       Transaction[]
+
+  @@index([userLivreurId])
+  @@index([ville])
+  @@index([estDisponible])
+}
+
+model Document {
+  id         String    @id @default(uuid())
+  type       String
+  url        String
+  adminId    String?
+  boutiqueId String?
+  livreurId  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  admin      Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  boutique   Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  livreur    Livreur?  @relation(fields: [livreurId], references: [id], onDelete: Cascade)
+
+  @@index([boutiqueId])
+  @@index([adminId])
+}
+
+model Colis {
+  id          String    @id @default(cuid())
+  description String
+  type        TypeColis
+  poids       Float?
+  volume      Float?
+  livraisonId String
+  createdAt   DateTime  @default(now())
+  livraison   Livraison @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
+
+  @@index([livraisonId])
+}
+
+model Livraison {
+  id               String          @id @default(cuid())
+  livreurId        String?
+  boutiqueId       String?
+  adresseDepart    String
+  latitudeDepart   Float?
+  longitudeDepart  Float?
+  adresseArrivee   String
+  latitudeArrivee  Float?
+  longitudeArrivee Float?
+  distance         Float?
+  tarif            Int?            @default(0)
+  commission       Int?            @default(0)
+  statut           StatutLivraison @default(EN_ATTENTE)
+  dateDemande      DateTime        @default(now())
+  dateAcceptation  DateTime?
+  dateRecuperation DateTime?
+  dateLivraison    DateTime?
+  dateAnnulation   DateTime?
+  noteBoutique     String?
+  noteLivreur      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  colis            Colis[]
+  evaluation       Evaluation?
+  boutique         Boutique?       @relation(fields: [boutiqueId], references: [id])
+  livreur          Livreur?        @relation(fields: [livreurId], references: [id])
+  suivisPosition   SuiviPosition[]
+  transactions     Transaction[]
+
+  @@index([boutiqueId])
+  @@index([livreurId])
+  @@index([statut])
+  @@index([dateDemande])
+}
+
+model SuiviPosition {
+  id          String    @id @default(cuid())
+  livraisonId String
+  latitude    Float
+  longitude   Float
+  timestamp   DateTime  @default(now())
+  livraison   Livraison @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
+
+  @@index([livraisonId])
+  @@index([timestamp])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      TypeNotification
+  titre     String
+  message   String
+  lue       Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lue])
+  @@index([createdAt])
+}
+
+model Evaluation {
+  id                      String    @id @default(cuid())
+  livraisonId             String    @unique
+  noteVersLivreur         Int?
+  commentaireVersLivreur  String?
+  noteVersBoutique        Int?
+  commentaireVersBoutique String?
+  livreurEvaluateurId     String?
+  livreurEvalueId         String?
+  boutiqueEvaluateurId    String?
+  boutiqueEvalueId        String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  boutiqueEvaluateur      Boutique? @relation("EvaluationsDonnees", fields: [boutiqueEvaluateurId], references: [id])
+  boutiqueEvalue          Boutique? @relation("EvaluationsRecues", fields: [boutiqueEvalueId], references: [id])
+  livraison               Livraison @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
+  livreurEvaluateur       Livreur?  @relation("EvaluationsDonnees", fields: [livreurEvaluateurId], references: [id])
+  livreurEvalue           Livreur?  @relation("EvaluationsRecues", fields: [livreurEvalueId], references: [id])
+
+  @@index([livraisonId])
+  @@index([livreurEvalueId])
+  @@index([boutiqueEvalueId])
+}
+
+model Transaction {
+  id               String            @id @default(cuid())
+  livraisonId      String?
+  boutiqueId       String?
+  livreurId        String?
+  adminId          String?
+  type             TypeTransaction
+  montant          Float
+  commission       Float?
+  modePaiement     ModePaiement
+  statut           StatutTransaction @default(EN_ATTENTE)
+  referenceExterne String?
+  recu             String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  admin            Admin?            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  boutique         Boutique?         @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  livraison        Livraison?        @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
+  livreur          Livreur?          @relation(fields: [livreurId], references: [id], onDelete: Cascade)
+
+  @@index([livraisonId])
+  @@index([boutiqueId])
+  @@index([livreurId])
+  @@index([statut])
+  @@index([createdAt])
+}
+
+model Gain {
+  id          String   @id @default(cuid())
+  livreurId   String?
+  adminId     String?
+  montant     Int
+  date        DateTime @default(now())
+  description String
+  admin       Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  livreur     Livreur? @relation(fields: [livreurId], references: [id], onDelete: Cascade)
+
+  @@index([livreurId])
+  @@index([date])
+}
+
+model SupportTicket {
+  id          String           @id @default(cuid())
+  userId      String
+  sujet       String
+  description String
+  priorite    PrioriteTicket   @default(MOYENNE)
+  statut      StatutTicket     @default(OUVERT)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  messages    MessageSupport[]
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([statut])
+}
+
+model MessageSupport {
+  id        String        @id @default(cuid())
+  ticketId  String
+  auteur    String
+  message   String
+  createdAt DateTime      @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+enum UserRole {
+  BOUTIQUE
+  LIVREUR
+  ADMIN
+}
+
+enum TransportMode {
+  MOTO
+  VOITURE
+  VELO
+  CANTER
+  AVION
+  TRAIN
+  BATEAU
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum TypeNotification {
+  NOUVELLE_LIVRAISON
+  LIVRAISON_ACCEPTEE
+  LIVRAISON_EN_COURS
+  LIVRAISON_TERMINEE
+  LIVRAISON_ANNULEE
+  PAIEMENT_RECU
+  EVALUATION_RECUE
+  MESSAGE_SUPPORT
+  ALERTE_SYSTEME
+}
+
+enum StatutTicket {
+  OUVERT
+  EN_COURS
+  RESOLU
+  FERME
+}
+
+enum PrioriteTicket {
+  BASSE
+  MOYENNE
+  HAUTE
+  URGENTE
+}
+
+enum StatutLivraison {
+  EN_ATTENTE
+  ACCEPTEE
+  EN_COURS
+  LIVREE
+  ANNULEE
+  EN_LITIGE
+}
+
+enum TypeColis {
+  DOCUMENT
+  PETIT_COLIS
+  MOYEN_COLIS
+  GROS_COLIS
+  FRAGILE
+  ALIMENTAIRE
+}
+
+enum TypeTransaction {
+  PAIEMENT_LIVRAISON
+  COMMISSION
+  RETRAIT
+  REMBOURSEMENT
+}
+
+enum StatutTransaction {
+  EN_ATTENTE
+  VALIDEE
+  ECHOUEE
+  REMBOURSEE
+}
+
+enum ModePaiement {
+  MOBILE_MONEY
+  CARTE_BANCAIRE
+  COMPTE_INTERNE
+  CASH
+}
