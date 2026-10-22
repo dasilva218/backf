@@ -122,9 +122,111 @@ model Colis {
 }
 
 model Livraison {
-  id               String          @id @default(cuid())
-  livreurId        String?
-  boutiqueId       String?
+  id         String  @id @default(cuid())
+  livreurId  String?
+  boutiqueId String?
+
+  // ─── Rattachement à la mission Ewuang ────────────────────────────────────
+  //
+  // Cette plateforme n'a pas de livreurs : chaque course est dispatchée à
+  // Ewuang, qui l'exécute avec sa flotte. Ces champs sont la couture entre les
+  // deux bases.
+  //
+  // `referenceExterne` est NOTRE identifiant, envoyé dans POST /partenaires/
+  // missions ; Ewuang en fait sa clé d'idempotence, donc le même appel rejoué
+  // ne crée pas deux courses. Unique ici aussi : c'est ce qui garantit qu'on ne
+  // l'émet jamais pour deux courses différentes.
+  //
+  // `missionEwuangId` est l'identifiant rendu par Ewuang. Nullable parce qu'il
+  // n'existe qu'APRÈS un POST réussi : une course créée localement et dont
+  // l'appel a échoué doit rester visible et rejouable, pas disparaître.
+  referenceExterne String? @unique
+  missionEwuangId  String? @unique
+
+  /// Statut d'Ewuang, repris TEL QUEL : « En attente », « En cours de
+  /// livraison », « Colis récupéré », « Livrée », « Annulée », « Reportée ».
+  ///
+  /// Texte et non enum, volontairement. Ce statut appartient à l'autre système :
+  /// une valeur qu'Ewuang ajouterait et qu'un enum local ignorerait ferait
+  /// échouer le webhook, donc relancer, donc bloquer la mission — une panne
+  /// causée par notre propre modèle. Le champ `statut` ci-dessous reste le
+  /// vocabulaire interne de l'écran ; celui-ci fait foi.
+  statutEwuang String?
+
+  /// Code de remise à quatre chiffres, généré par Ewuang à la création.
+  /// C'est à NOUS de le transmettre au destinataire : le livreur le lui
+  /// réclamera à la remise, et sans lui la course ne peut pas se clôturer.
+  codeRemise String?
+
+  // ─── Instantané du livreur ───────────────────────────────────────────────
+  //
+  // Un instantané, pas une clé étrangère : le livreur n'existe pas dans cette
+  // base et n'y existera pas. Ces trois champs sont figés à l'attribution, par
+  // le webhook `mission.attribuee`. Les figer est ce qui permet de relire une
+  // course d'il y a six mois avec le nom qu'elle portait alors, même si le
+  // livreur a quitté Ewuang. Pour l'état VIVANT — position, en ligne, occupé —
+  // on interroge GET /api/partenaires/flotte, on ne le stocke pas.
+  livreurEwuangId      String?
+  livreurNom           String?
+  livreurContact       String?
+  livreurTypeVehicule  String?
+
+  // ─── Le destinataire ─────────────────────────────────────────────────────
+  //
+  // Simple contact, sans compte : Ewuang ne lui en crée pas et nous n'avons pas
+  // à lui en créer un. `adresseArrivee` porte déjà son adresse.
+  destinataireNom     String?
+  destinataireContact String?
+
+  // ─── L'argent de la course ───────────────────────────────────────────────
+  //
+  // Renvoyés par POST /partenaires/missions et stockés tels quels. `tarif`
+  // ci-dessous est ce que paie le vendeur ; `tarifEwuang` est ce que la course
+  // nous coûte. Sans les deux, la marge de l'activité n'est lisible d'aucun
+  // côté.
+  //
+  // `remunerationLivreur` est servi au partenaire parce qu'il est le payeur —
+  // Ewuang le masque en revanche à ses propres livreurs, qui n'ont pas à lire
+  // la marge par soustraction.
+  tarifEwuang         Int?
+  remunerationLivreur Int?
+
+  /// `emis_at` du dernier événement appliqué à cette mission.
+  ///
+  /// L'ordre de livraison des webhooks n'est pas garanti : un
+  /// `mission.attribuee` relancé peut arriver après un `mission.livree`. Sans
+  /// cette borne, il écraserait un statut plus récent par un plus ancien, et la
+  /// course repartirait en arrière sans que rien ne le signale.
+  ///
+  /// `@db.Timestamptz` et non le `TIMESTAMP(3)` que Prisma pose par défaut :
+  /// celui-ci est SANS fuseau, et le Gabon est à UTC+1. Une date naïve stockée
+  /// en UTC puis relue comme locale décale tout filtre par jour d'une heure —
+  /// une course de 00h30 tombe la veille. Toute nouvelle colonne de date de ce
+  /// schéma doit porter cette annotation.
+  dernierEvenementAt DateTime? @db.Timestamptz
+
+  // ─── La demande de la boutique ───────────────────────────────────────────
+  //
+  // Le trajet et le type fixent notre prix (`tarif`, grille par trajet). Le
+  // contrat Ewuang ne connaît qu'une zone : on lui envoie `zoneArrivee`, qui
+  // est chez lui la ville de destination.
+  typeCourse  String?
+  zoneDepart  String?
+  zoneArrivee String?
+
+  /// Corps EXACT de POST /partenaires/missions, tel qu'envoyé la première fois.
+  ///
+  /// Ewuang est idempotent sur `reference_externe`, mais seulement à corps
+  /// identique : un corps différent répond 409. Rejouer après un timeout exige
+  /// donc de renvoyer ce corps-ci, pas de le reconstruire depuis les colonnes
+  /// (un profil boutique modifié entre-temps changerait le contact d'enlèvement).
+  chargeEwuang Json?
+
+  /// Dernier refus ou échec de transmission à Ewuang. Null quand la mission est
+  /// créée. Une course sans `missionEwuangId` et avec ce champ renseigné est
+  /// « non transmise » : elle se rejoue par POST /livraisons/:id/renvoyer.
+  erreurEwuang String?
+
   adresseDepart    String
   latitudeDepart   Float?
   longitudeDepart  Float?
@@ -155,6 +257,50 @@ model Livraison {
   @@index([livreurId])
   @@index([statut])
   @@index([dateDemande])
+  @@index([statutEwuang])
+  @@index([livreurEwuangId])
+}
+
+/// Journal des webhooks reçus d'Ewuang.
+///
+/// Ewuang livre ses événements AU MOINS UNE FOIS : sur timeout ou sur une
+/// réponse ≥ 400, il relance avec un délai croissant. Les doublons ne sont donc
+/// pas hypothétiques, ils sont certains. `evenementId` unique est ce qui les
+/// absorbe — sans lui, un changement de statut s'applique deux fois.
+///
+/// La table garde aussi la charge utile brute. C'est ce qui permet de rejouer
+/// un événement qu'un bug local a mal traité, sans redemander à Ewuang de le
+/// renvoyer : il ne le fera pas, pour lui il a été acquitté.
+model EvenementEwuangRecu {
+  id          String   @id @default(cuid())
+  /// `evenement_id` du corps, repris aussi dans l'en-tête X-Ewuang-Evenement.
+  evenementId String   @unique
+  type        String
+  /// Nullable : un événement dont la mission est inconnue ici est conservé
+  /// plutôt que rejeté, sinon il est perdu pour de bon.
+  missionEwuangId String?
+  /// Horodatage d'ÉMISSION côté Ewuang, pas de réception : c'est lui qui
+  /// ordonne les événements d'une même mission.
+  ///
+  /// `@db.Timestamptz` sur les trois dates de cette table — voir
+  /// `Livraison.dernierEvenementAt` : le défaut de Prisma est sans fuseau, et
+  /// comparer un instant naïf à un autre venu d'un `Z` est une fausse
+  /// comparaison d'une heure au Gabon. Ici elle casserait la règle d'ordre.
+  emisAt      DateTime  @db.Timestamptz
+  charge      Json
+  recuAt      DateTime  @default(now()) @db.Timestamptz
+  /// Null tant que l'événement n'a pas été appliqué. Un doublon acquitté sans
+  /// retraitement garde la date du premier passage.
+  traiteAt    DateTime? @db.Timestamptz
+  /// Renseigné quand l'événement a été délibérément NON appliqué : mission
+  /// inconnue, ou plus ancien que le dernier appliqué. Un rejet silencieux
+  /// serait indébogable.
+  ignoreMotif String?
+
+  @@index([missionEwuangId])
+  @@index([type])
+  @@index([recuAt])
+  @@index([traiteAt])
 }
 
 model SuiviPosition {

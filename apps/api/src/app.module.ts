@@ -7,9 +7,13 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './auth/guards/roles.guard.js';
+import { EwuangModule } from './ewuang/ewuang.module.js';
+import { TarifsModule } from './tarifs/tarifs.module.js';
+import { BoutiquesModule } from './boutiques/boutiques.module.js';
+import { LivraisonsModule } from './livraisons/livraisons.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]), UsersModule, PrismaModule, AuthModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]), UsersModule, PrismaModule, AuthModule, EwuangModule, TarifsModule, BoutiquesModule, LivraisonsModule],
   controllers: [],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard }, // 1. limite le débit
