@@ -77,8 +77,7 @@ export class UsersService {
         } catch (error) {
             // P2002 = violation de la contrainte d'unicité (email déjà pris)
             if (
-                error instanceof Prisma.PrismaClientKnownRequestError &&
-                error.code === 'P2002'
+                error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
             ) {
                 throw new ConflictException('Cet email est déjà utilisé');
             }
