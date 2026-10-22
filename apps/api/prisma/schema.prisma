@@ -207,9 +207,10 @@ model Livraison {
 
   // ─── La demande de la boutique ───────────────────────────────────────────
   //
-  // Le trajet et le type fixent notre prix (`tarif`, grille par trajet). Le
-  // contrat Ewuang ne connaît qu'une zone : on lui envoie `zoneArrivee`, qui
-  // est chez lui la ville de destination.
+  // La zone d'arrivée et le type fixent notre prix (`tarif`) ; le départ est
+  // conservé mais n'entre pas dans le prix. Le contrat Ewuang ne connaît
+  // qu'une zone : on lui envoie `zoneArrivee`, qui est chez lui la ville de
+  // destination.
   typeCourse  String?
   zoneDepart  String?
   zoneArrivee String?

@@ -6,7 +6,7 @@ Ce fichier guide Claude Code (claude.ai/code) dans ce dépôt.
 
 **find_delivery** (« trouver un livreur ») : plateforme où une boutique soumet une course de livraison. Elle **n'a pas de flotte propre** : chaque course est dispatchée à **Ewuang** via son API partenaires, et le suivi revient par webhook. Ewuang exécute, find_delivery facture la boutique (`Livraison.tarif`) et paie Ewuang (`Livraison.tarifEwuang`).
 
-État actuel : début de projet. Il y a l'authentification, les utilisateurs, le profil boutique, l'intégration Ewuang (client + webhook), la grille de tarifs (devis) et la création / lecture / annulation des courses. Ni paiement de la boutique, ni envoi du code de remise par SMS pour l'instant. `apps/web` est encore le starter create-turbo.
+État actuel : début de projet. Il y a l'authentification, les utilisateurs, le profil boutique, l'intégration Ewuang (client + webhook), la grille de tarifs (devis) et la création / lecture / annulation des courses. `apps/web` est l'espace boutique (inscription, profil, courses). Ni paiement de la boutique, ni envoi du code de remise par SMS pour l'instant.
 
 Code, commentaires, messages d'erreur et Swagger sont **en français**. Conserve-le.
 
@@ -15,7 +15,7 @@ Code, commentaires, messages d'erreur et Swagger sont **en français**. Conserve
 Turborepo + **pnpm** (`pnpm@11`, Node ≥ 24), workspaces `apps/*` et `packages/*`.
 
 - [apps/api/](apps/api/) : API **NestJS 12**, ESM (`"type": "module"`), Prisma 7 + PostgreSQL. C'est là que se trouve tout le code métier.
-- [apps/web/](apps/web/) : Next.js 16 / React 19, starter non modifié (port 3000).
+- [apps/web/](apps/web/) : Next.js 16 / React 19, espace boutique (port 3000). Voir « apps/web — Espace boutique ».
 - [packages/ui/](packages/ui/) (`@repo/ui`), [packages/eslint-config/](packages/eslint-config/), [packages/typescript-config/](packages/typescript-config/) : partagés par `web`. `api` ne les utilise pas : il a son propre oxlint et son propre tsconfig.
 
 [AGENTS.md](AGENTS.md) est un bloc géré par `turbo` : avant de toucher à `turbo.json` ou aux commandes turbo, lis la doc embarquée dans le package `turbo` installé, pas ta mémoire.
@@ -87,28 +87,22 @@ Ces tarifs sont propres à find_delivery. Ils ne sont **pas** les frais de livra
 
 Le calcul vit en fonctions pures dans [grille-tarifs.ts](apps/api/src/tarifs/grille-tarifs.ts) et alimente les trois colonnes de `Livraison` : `tarif` (prix client), `commission` (5 % du prix, arrondi à l'entier) et `tarifEwuang` (= `tarif − commission`, la part d'Ewuang).
 
-Prix **par trajet**, zone de départ → zone d'arrivée (`PRIX_STANDARD[départ][arrivée]`, lignes de l'affiche = départ), plus un supplément selon le type : express +1 000, volumineux +2 000. Prix standard :
+Prix **par zone d'arrivée** (`PRIX_STANDARD[arrivée]`), plus un supplément selon le type : express +1 000, volumineux +2 000. Prix standard : Akanda 1 500, Libreville 2 000, Owendo 2 000 — **identiques à `tarif_partenaire` côté Ewuang** (tableau plus bas), et ils doivent le rester.
 
-| Départ ↓ / Arrivée → | Akanda | Libreville | Owendo |
-|---|---|---|---|
-| **Akanda** | 1 500 | 2 000 | 3 500 |
-| **Libreville** | 2 500 | 2 000 | 3 000 |
-| **Owendo** | 3 500 | 2 500 | 2 000 |
-
-- **La grille n'est pas symétrique** (Akanda → Libreville 2 000, Libreville → Akanda 2 500) : c'est voulu, ne pas « corriger » un sens sur l'autre.
-- `GET /api/v1/tarifs` : grille complète (27 trajets × types). `GET /api/v1/tarifs/devis?zone_depart=…&zone_arrivee=…&type_course=…` : un devis. Les deux exigent un JWT (pas de `@Public()`).
+- **Pourquoi pas par trajet.** Jusqu'au 2026-10-22 la grille suivait l'affiche « Octobre Rose » par trajet (départ → arrivée, non symétrique). Mais Ewuang ne reçoit que la zone d'arrivée et paie le livreur au prix de cette zone : Libreville → Owendo express était facturé 4 000 au client et le livreur touchait 2 850 au lieu de 3 800, l'écart gonflant notre commission. Choix de Franck : facturer au prix de la zone d'arrivée plutôt que de faire évoluer le contrat. Revenir au prix par trajet exige d'ajouter `zone_depart` au contrat et une grille départ × arrivée dans `partenaire_tarifs`, des deux côtés.
+- Le départ reste dans le devis, la course et l'affichage ; il n'entre simplement pas dans le prix.
+- `GET /api/v1/tarifs` : grille complète (27 trajets × types, le prix ne variant qu'avec l'arrivée), **publique** (affichée sur la page d'accueil du front). `GET /api/v1/tarifs/devis?zone_depart=…&zone_arrivee=…&type_course=…` : un devis, exige un JWT. Les deux ne servent que le **prix client** (`prixClient` dans le contrôleur) : `commission` et `tarifEwuang` ne sortent jamais par ces routes.
 - Zones acceptées : `Akanda | Libreville | Owendo`. **PK** figure sur l'affiche mais est exclue tant qu'Ewuang ne la sert pas (absente de `zones_livraison`) : elle répond 400.
 - **La grille sert à deviser, elle ne fait pas foi.** À la création de la course, stocker comme `tarifEwuang` la `remuneration_livreur` **renvoyée par Ewuang** (pas son `tarif`, qui est le prix de la zone) ; la commission réelle est alors `tarif client − tarifEwuang`.
-- ⚠️ **Ewuang ne facture pas encore par trajet** : son contrat ne connaît qu'une `zone` par mission, et `partenaire_tarifs` un prix par zone (voir ci-dessous). Sur une course entre deux zones, la part renvoyée par Ewuang ne vaudra donc pas 95 % du prix client, et la commission ne sera pas de 5 %. Il faut faire évoluer le contrat (zone de départ + zone d'arrivée) des deux côtés.
 - **Toute modification de prix se reporte des deux côtés.** Les prix sont dans le code : un changement de prix demande un redéploiement.
 - [grille-tarifs.spec.ts](apps/api/src/tarifs/grille-tarifs.spec.ts) écrit les neuf prix standard en dur : à mettre à jour en même temps que la grille.
 
 ## Courses ([src/livraisons/](apps/api/src/livraisons/), [src/boutiques/](apps/api/src/boutiques/))
 
 - **Profil boutique obligatoire.** `register` ne crée que le `User` ; `PUT /boutiques/moi` crée ou met à jour la ligne `Boutique`. Sans elle, `POST /livraisons` répond 403 (`Livraison.boutiqueId` pointe sur `Boutique.id`). Adresse et téléphone du profil servent d'enlèvement par défaut.
-- `POST /livraisons` (BOUTIQUE) : prix = grille par trajet. **La course est écrite avant l'appel à Ewuang**, avec `referenceExterne = FD-<uuid>` et le corps exact envoyé dans `chargeEwuang`. Issue : 201 transmise ; **202** Ewuang injoignable (`transmise: false`, motif dans `erreurEwuang`) ; 400 refus définitif d'Ewuang → course passée `ANNULEE`.
+- `POST /livraisons` (BOUTIQUE) : prix = grille, zone d'arrivée + type. **La course est écrite avant l'appel à Ewuang**, avec `referenceExterne = FD-<uuid>` et le corps exact envoyé dans `chargeEwuang`. Issue : 201 transmise ; **202** Ewuang injoignable (`transmise: false`, motif dans `erreurEwuang`) ; 400 refus définitif d'Ewuang → course passée `ANNULEE`.
 - `POST /livraisons/:id/renvoyer` rejoue `chargeEwuang` **tel quel** : Ewuang n'est idempotent qu'à corps identique (sinon 409). Ne jamais reconstruire le corps depuis les colonnes ou le profil.
-- Zone envoyée à Ewuang = **`zone_arrivee`** (chez lui, `zone` est la ville de destination). `zoneDepart`/`zoneArrivee`/`typeCourse` restent chez nous pour le prix par trajet.
+- Zone envoyée à Ewuang = **`zone_arrivee`** (chez lui, `zone` est la ville de destination). `zoneDepart`/`zoneArrivee`/`typeCourse` restent chez nous (le départ pour l'affichage seulement).
 - À la transmission, `tarifEwuang` = `remuneration_livreur` renvoyée par Ewuang et `commission` = `tarif client − tarifEwuang`. `statutEwuang` n'est posé que s'il est encore null (un webhook peut arriver avant la réponse).
 - `DELETE /livraisons/:id` : annule chez Ewuang d'abord. Une course **non transmise** est d'abord rejouée (idempotent) pour récupérer la mission peut-être créée malgré un timeout — l'annuler seulement en local laisserait une mission vivante dans la flotte. Ewuang injoignable → 503, rien n'est annulé.
 - Portée : une BOUTIQUE ne voit que ses courses (404 sur celle d'une autre, pas 403) ; l'ADMIN voit tout. `commission`, `tarifEwuang`, `remunerationLivreur` ne sont servis qu'à l'ADMIN.
@@ -148,6 +142,21 @@ Contrat de référence : **`../ewuang-web/docs/contrat-api-partenaires.md`** (d�
 - `codeRemise` (4 chiffres) : c'est à nous de le transmettre au destinataire, sinon la course ne peut pas être clôturée.
 
 Côté Ewuang, seul le vérificateur de signature est couvert par des tests ([ewuang-signature.spec.ts](apps/api/src/ewuang/ewuang-signature.spec.ts)).
+
+## apps/web — Espace boutique
+
+Next 16 App Router, Tailwind v4 + primitives shadcn recopiées d'`ewuang-web` ([components/ui/](apps/web/components/ui/)). `<select>` natif plutôt que Radix Select (alimente `FormData` sans champ caché). Mode sombre = celui du système.
+
+- **Next 16 : `middleware.ts` s'appelle `proxy.ts`.** [proxy.ts](apps/web/proxy.ts) ne fait qu'un aiguillage optimiste sur le cookie (lecture de la charge du JWT, **sans** vérifier la signature : le secret reste dans l'API). La vraie barrière est l'API.
+- **Session = le JWT de l'API dans un cookie httpOnly `fd_session`** ([lib/session.ts](apps/web/lib/session.ts)), qui expire avec le jeton. Pas de jeton de rafraîchissement côté API : reconnexion toutes les 30 min (`JWT_EXPIRES_IN`).
+- **Le navigateur n'appelle jamais l'API.** Tout passe par [lib/api.ts](apps/web/lib/api.ts) (`server-only`) depuis les Server Components et les Server Actions ([app/actions/](apps/web/app/actions/)). D'où `API_URL` sans `NEXT_PUBLIC_` (défaut en dev : `http://localhost:3001/api/v1`, obligatoire en prod) et aucun CORS à ouvrir.
+- Un 401 de l'API ou un jeton expiré/d'un autre rôle mène à **`/deconnexion`** (Route Handler) : un Server Component ne peut pas effacer de cookie, et sans ce détour `proxy.ts` renverrait vers l'espace en boucle.
+- L'inscription **impose `role: BOUTIQUE`** dans la Server Action : l'API accepte encore `ADMIN` (faille connue ci-dessous). La connexion refuse tout jeton d'un autre rôle.
+- **Formulaires : `onSubmit` + `startTransition`, jamais `<form action={…}>`** ([use-retour-action.ts](apps/web/components/use-retour-action.ts)). React 19 vide les champs d'un `<form action>` à chaque fin d'action, erreur comprise.
+- Règle UX : toute action serveur affiche l'**overlay plein écran** ([overlay-chargement.tsx](apps/web/components/overlay-chargement.tsx), 400 ms minimum) puis un toast sonner.
+- Le devis s'affiche en direct depuis `GET /tarifs`, chargé une fois côté serveur. Seul `tarif` est montré.
+- Dates formatées avec `timeZone: 'Africa/Libreville'` ([lib/affichage.ts](apps/web/lib/affichage.ts)) ; la date souhaitée saisie (`datetime-local`) est envoyée en `+01:00`.
+- Statut affiché : `statutEwuang` fait foi dès que la course est transmise ; avant, « Non transmise » (bouton Renvoyer) ou « Annulée ».
 
 ## Points connus à ne pas prendre pour des régressions
 

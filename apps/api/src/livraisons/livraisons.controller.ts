@@ -32,7 +32,7 @@ export class LivraisonsController {
     @ApiOperation({
         summary: 'Soumet une course, dispatchée à la flotte Ewuang',
         description:
-            "Le prix vient de la grille find_delivery (trajet + type). Le `codeRemise` renvoyé est à transmettre au destinataire : le livreur le lui réclamera à la remise.",
+            "Le prix vient de la grille find_delivery (zone d'arrivée + type). Le `codeRemise` renvoyé est à transmettre au destinataire : le livreur le lui réclamera à la remise.",
     })
     @ApiResponse({ status: 201, description: 'Course créée et transmise à Ewuang.' })
     @ApiResponse({

@@ -10,52 +10,44 @@ import {
 /**
  * Les montants attendus sont écrits en dur, et non recalculés : un test qui
  * reprendrait la formule du code passerait avec la même erreur que lui.
- * Ils recopient l'affiche « Octobre Rose », lignes = départ.
+ * Ils recopient la grille `partenaire_tarifs` d'Ewuang (`tarif_partenaire` →
+ * `remuneration_livreur`) : un écart avec elle, c'est un livreur mal payé.
  */
 
-describe('calculerDevis — prix standard, départ → arrivée', () => {
+describe('calculerDevis — le prix dépend de la zone d\'arrivée seule', () => {
     it.each([
-        ['Akanda', 'Akanda', 1_500],
-        ['Akanda', 'Libreville', 2_000],
-        ['Akanda', 'Owendo', 3_500],
-        ['Libreville', 'Akanda', 2_500],
-        ['Libreville', 'Libreville', 2_000],
-        ['Libreville', 'Owendo', 3_000],
-        ['Owendo', 'Akanda', 3_500],
-        ['Owendo', 'Libreville', 2_500],
-        ['Owendo', 'Owendo', 2_000],
-    ] as const)('%s → %s : %i', (depart, arrivee, tarif) => {
-        expect(calculerDevis(depart, arrivee, 'standard').tarif).toBe(tarif);
+        ['Akanda', 'standard', 1_500, 1_425],
+        ['Akanda', 'express', 2_500, 2_375],
+        ['Akanda', 'volumineux', 3_500, 3_325],
+        ['Libreville', 'standard', 2_000, 1_900],
+        ['Libreville', 'express', 3_000, 2_850],
+        ['Libreville', 'volumineux', 4_000, 3_800],
+        ['Owendo', 'standard', 2_000, 1_900],
+        ['Owendo', 'express', 3_000, 2_850],
+        ['Owendo', 'volumineux', 4_000, 3_800],
+    ] as const)('arrivée %s en %s : %i, dont %i pour Ewuang', (arrivee, type, tarif, tarifEwuang) => {
+        for (const depart of ZONES) {
+            const devis = calculerDevis(depart, arrivee, type);
+            expect(devis.tarif).toBe(tarif);
+            expect(devis.tarifEwuang).toBe(tarifEwuang);
+        }
     });
 
-    // La grille n'est pas symétrique : c'est le sens qui fixe le prix. Un
-    // départ et une arrivée inversés par erreur donneraient le mauvais tarif
-    // sans rien casser d'autre.
-    it('distingue le sens du trajet', () => {
-        expect(calculerDevis('Akanda', 'Libreville', 'standard').tarif).toBe(2_000);
-        expect(calculerDevis('Libreville', 'Akanda', 'standard').tarif).toBe(2_500);
-    });
-});
-
-describe('calculerDevis — répartition et suppléments', () => {
-    it('Libreville → Owendo en express : le client paie 4 000, find_delivery touche 200, Ewuang garde 3 800', () => {
+    // Le cas qui a payé un livreur 2 850 pour une course facturée 4 000.
+    it('Libreville → Owendo en express : le client paie 3 000, comme la zone Owendo chez Ewuang', () => {
         expect(calculerDevis('Libreville', 'Owendo', 'express')).toEqual({
             zoneDepart: 'Libreville',
             zoneArrivee: 'Owendo',
             typeCourse: 'express',
-            tarif: 4_000,
-            commission: 200,
-            tarifEwuang: 3_800,
+            tarif: 3_000,
+            commission: 150,
+            tarifEwuang: 2_850,
             devise: 'XAF',
         });
     });
+});
 
-    it('Akanda → Owendo en volumineux : 5 500, dont 275 pour find_delivery', () => {
-        const devis = calculerDevis('Akanda', 'Owendo', 'volumineux');
-        expect(devis.tarif).toBe(5_500);
-        expect(devis.commission).toBe(275);
-        expect(devis.tarifEwuang).toBe(5_225);
-    });
+describe('calculerDevis — répartition', () => {
 
     // Le client paie le prix de la grille, jamais plus : la commission est
     // prélevée sur la part d'Ewuang, pas ajoutée au prix.

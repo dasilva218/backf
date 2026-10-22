@@ -101,8 +101,8 @@ describe('LivraisonsService.creer', () => {
 
         const donnees = f.prisma.livraison.create.mock.calls[0][0].data;
         expect(donnees.chargeEwuang).toEqual(f.ewuang.creerMission.mock.calls[0][0]);
-        // Libreville → Akanda standard : 2 500 sur la grille.
-        expect(donnees.tarif).toBe(2_500);
+        // Libreville → Akanda standard : le prix de la zone d'arrivée, 1 500.
+        expect(donnees.tarif).toBe(1_500);
     });
 
     it("succès : la commission devient le prix client moins la part d'Ewuang (remuneration_livreur, pas tarif)", async () => {
@@ -112,7 +112,7 @@ describe('LivraisonsService.creer', () => {
             missionEwuangId: 'm-1',
             codeRemise: '4817',
             tarifEwuang: 1_425,
-            commission: 2_500 - 1_425,
+            commission: 1_500 - 1_425,
             erreurEwuang: null,
         });
         // Le statut ne doit pas écraser celui d'un webhook arrivé avant.

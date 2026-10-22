@@ -12,12 +12,18 @@ import type { TypeCourse } from '../ewuang/ewuang.client.js';
  *
  * ── D'où viennent ces montants ─────────────────────────────────────────────
  *
- * `PRIX_STANDARD` reprend la grille moto « Octobre Rose » remise pour
- * find_delivery : un prix par trajet, zone de départ → zone d'arrivée (les
- * lignes de l'affiche sont le départ). Le tableau n'est PAS symétrique —
- * Akanda → Libreville coûte 2 000, Libreville → Akanda 2 500 — ne pas
- * « corriger » un sens sur l'autre. Express = standard + 1 000, volumineux =
- * standard + 2 000.
+ * `PRIX_STANDARD` est un prix par zone d'ARRIVÉE, le seul que connaisse
+ * Ewuang : son contrat ne reçoit qu'une `zone` par mission (la destination) et
+ * sa grille `partenaire_tarifs` un prix par zone. Le prix par trajet de
+ * l'affiche « Octobre Rose » a été abandonné le 2026-10-22 : sur une course
+ * entre deux zones, le client payait le trajet (Libreville → Owendo express
+ * 4 000) quand Ewuang appliquait le prix de la zone (Owendo express 3 000) —
+ * le livreur touchait 2 850 au lieu de 3 800 et l'écart gonflait notre
+ * commission. Ces montants doivent rester égaux à `tarif_partenaire` côté
+ * Ewuang. Express = standard + 1 000, volumineux = standard + 2 000.
+ *
+ * Le départ reste dans le devis (il est stocké et affiché sur la course), il
+ * n'entre simplement plus dans le prix.
  *
  * La zone PK de l'affiche est volontairement absente : Ewuang ne la sert pas
  * encore (`zones_livraison`), une course PK serait refusée au dispatch.
@@ -48,11 +54,11 @@ export const COMMISSION_POURCENT = 5;
 
 export const DEVISE = 'XAF';
 
-/** Prix client d'une course standard, `PRIX_STANDARD[départ][arrivée]`, en FCFA. */
-const PRIX_STANDARD: Record<Zone, Record<Zone, number>> = {
-    Akanda: { Akanda: 1_500, Libreville: 2_000, Owendo: 3_500 },
-    Libreville: { Akanda: 2_500, Libreville: 2_000, Owendo: 3_000 },
-    Owendo: { Akanda: 3_500, Libreville: 2_500, Owendo: 2_000 },
+/** Prix client d'une course standard, selon la zone d'arrivée, en FCFA. */
+const PRIX_STANDARD: Record<Zone, number> = {
+    Akanda: 1_500,
+    Libreville: 2_000,
+    Owendo: 2_000,
 };
 
 /** Supplément ajouté au prix standard, selon le type de course. */
@@ -92,7 +98,7 @@ export function calculerDevis(
     zoneArrivee: Zone,
     typeCourse: TypeCourse,
 ): Devis {
-    const tarif = PRIX_STANDARD[zoneDepart][zoneArrivee] + SUPPLEMENT[typeCourse];
+    const tarif = PRIX_STANDARD[zoneArrivee] + SUPPLEMENT[typeCourse];
     const commission = calculerCommission(tarif);
 
     return {
