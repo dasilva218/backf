@@ -98,7 +98,7 @@ Prix **par trajet**, zone de départ → zone d'arrivée (`PRIX_STANDARD[départ
 - **La grille n'est pas symétrique** (Akanda → Libreville 2 000, Libreville → Akanda 2 500) : c'est voulu, ne pas « corriger » un sens sur l'autre.
 - `GET /api/v1/tarifs` : grille complète (27 trajets × types). `GET /api/v1/tarifs/devis?zone_depart=…&zone_arrivee=…&type_course=…` : un devis. Les deux exigent un JWT (pas de `@Public()`).
 - Zones acceptées : `Akanda | Libreville | Owendo`. **PK** figure sur l'affiche mais est exclue tant qu'Ewuang ne la sert pas (absente de `zones_livraison`) : elle répond 400.
-- **La grille sert à deviser, elle ne fait pas foi.** À la création de la course, stocker comme `tarifEwuang` le `tarif` **renvoyé par Ewuang** ; la commission réelle est alors `tarif client − tarifEwuang`.
+- **La grille sert à deviser, elle ne fait pas foi.** À la création de la course, stocker comme `tarifEwuang` la `remuneration_livreur` **renvoyée par Ewuang** (pas son `tarif`, qui est le prix de la zone) ; la commission réelle est alors `tarif client − tarifEwuang`.
 - ⚠️ **Ewuang ne facture pas encore par trajet** : son contrat ne connaît qu'une `zone` par mission, et `partenaire_tarifs` un prix par zone (voir ci-dessous). Sur une course entre deux zones, la part renvoyée par Ewuang ne vaudra donc pas 95 % du prix client, et la commission ne sera pas de 5 %. Il faut faire évoluer le contrat (zone de départ + zone d'arrivée) des deux côtés.
 - **Toute modification de prix se reporte des deux côtés.** Les prix sont dans le code : un changement de prix demande un redéploiement.
 - [grille-tarifs.spec.ts](apps/api/src/tarifs/grille-tarifs.spec.ts) écrit les neuf prix standard en dur : à mettre à jour en même temps que la grille.
@@ -109,7 +109,7 @@ Prix **par trajet**, zone de départ → zone d'arrivée (`PRIX_STANDARD[départ
 - `POST /livraisons` (BOUTIQUE) : prix = grille par trajet. **La course est écrite avant l'appel à Ewuang**, avec `referenceExterne = FD-<uuid>` et le corps exact envoyé dans `chargeEwuang`. Issue : 201 transmise ; **202** Ewuang injoignable (`transmise: false`, motif dans `erreurEwuang`) ; 400 refus définitif d'Ewuang → course passée `ANNULEE`.
 - `POST /livraisons/:id/renvoyer` rejoue `chargeEwuang` **tel quel** : Ewuang n'est idempotent qu'à corps identique (sinon 409). Ne jamais reconstruire le corps depuis les colonnes ou le profil.
 - Zone envoyée à Ewuang = **`zone_arrivee`** (chez lui, `zone` est la ville de destination). `zoneDepart`/`zoneArrivee`/`typeCourse` restent chez nous pour le prix par trajet.
-- À la transmission, `tarifEwuang` = `tarif` renvoyé par Ewuang et `commission` = `tarif client − tarifEwuang`. `statutEwuang` n'est posé que s'il est encore null (un webhook peut arriver avant la réponse).
+- À la transmission, `tarifEwuang` = `remuneration_livreur` renvoyée par Ewuang et `commission` = `tarif client − tarifEwuang`. `statutEwuang` n'est posé que s'il est encore null (un webhook peut arriver avant la réponse).
 - `DELETE /livraisons/:id` : annule chez Ewuang d'abord. Une course **non transmise** est d'abord rejouée (idempotent) pour récupérer la mission peut-être créée malgré un timeout — l'annuler seulement en local laisserait une mission vivante dans la flotte. Ewuang injoignable → 503, rien n'est annulé.
 - Portée : une BOUTIQUE ne voit que ses courses (404 sur celle d'une autre, pas 403) ; l'ADMIN voit tout. `commission`, `tarifEwuang`, `remunerationLivreur` ne sont servis qu'à l'ADMIN.
 - Le `codeRemise` est renvoyé à la boutique ; **aucun SMS n'est envoyé au destinataire** pour l'instant.
@@ -118,7 +118,7 @@ Prix **par trajet**, zone de départ → zone d'arrivée (`PRIX_STANDARD[départ
 
 Côté Ewuang, find_delivery est enregistré comme partenaire depuis le 2026-10-22 (`partenaires.nom = 'find_delivery'`, préfixe de clé `ewp_e4a8f6ad` depuis sa régénération le 2026-10-22, les quatre scopes). Reste à renseigner dans `/dashboard/partenaires` : l'URL du webhook (une fois le service déployé).
 
-Grille `partenaire_tarifs` côté Ewuang, en FCFA (prix client → part d'Ewuang = 95 %, après les 5 % reversés à find_delivery). Dans la base Ewuang, `tarif_partenaire` = `remuneration_livreur` = la part d'Ewuang : elle revient entièrement au livreur.
+Grille `partenaire_tarifs` côté Ewuang, en FCFA (prix client → part d'Ewuang = 95 %, après les 5 % reversés à find_delivery). Dans la base Ewuang, `tarif_partenaire` est le **prix** (colonne de gauche) et `remuneration_livreur` la **part d'Ewuang** (colonne de droite), qui revient entièrement au livreur. Vérifié le 2026-10-22 sur une vraie mission (Akanda standard : `tarif` 1 500, `remuneration_livreur` 1 425). C'est donc `remuneration_livreur` qui alimente `tarifEwuang`.
 
 | Zone | standard | express | volumineux |
 |---|---|---|---|

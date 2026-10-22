@@ -343,12 +343,17 @@ export class LivraisonsService {
                 data: {
                     missionEwuangId: mission.mission_id,
                     codeRemise: mission.code_remise,
-                    // La part d'Ewuang fait foi sur celle de notre grille, et
-                    // la commission réelle est la différence (voir
+                    // La part d'Ewuang est `remuneration_livreur`, PAS
+                    // `tarif` : dans sa grille `partenaire_tarifs`, `tarif`
+                    // est le prix de la zone (Akanda standard 1 500) et
+                    // `remuneration_livreur` ce qu'il garde après nous avoir
+                    // reversé 5 % (1 425). Prendre `tarif` donnerait une
+                    // commission nulle sur toute course intra-zone. Cette
+                    // part fait foi sur celle de notre grille (voir
                     // grille-tarifs.ts : la grille sert à deviser).
-                    tarifEwuang: mission.tarif,
+                    tarifEwuang: mission.remuneration_livreur,
                     remunerationLivreur: mission.remuneration_livreur,
-                    commission: tarif - mission.tarif,
+                    commission: tarif - mission.remuneration_livreur,
                     erreurEwuang: null,
                 },
             }),

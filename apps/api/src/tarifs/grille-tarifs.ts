@@ -28,7 +28,8 @@ import type { TypeCourse } from '../ewuang/ewuang.client.js';
  * ── Ce que cette grille n'est PAS ──────────────────────────────────────────
  *
  * Elle sert à DEVISER, avant que la course existe. À la création de la
- * mission, Ewuang renvoie sa part (`MissionCreee.tarif`) : c'est elle qui doit
+ * mission, Ewuang renvoie sa part (`MissionCreee.remuneration_livreur` — son
+ * `tarif` est le prix de la zone, pas sa part) : c'est elle qui doit
  * être stockée dans `Livraison.tarifEwuang`, et la commission réelle se lit
  * alors par différence avec le prix payé par le client.
  */

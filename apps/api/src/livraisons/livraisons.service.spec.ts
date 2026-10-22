@@ -40,7 +40,9 @@ const MISSION: MissionCreee = {
     reference_externe: 'FD-x',
     statut: 'En attente',
     code_remise: '4817',
-    tarif: 1_425,
+    // Valeurs réelles renvoyées par Ewuang pour Akanda standard (2026-10-22) :
+    // le prix de la zone, et sa part après les 5 % reversés.
+    tarif: 1_500,
     remuneration_livreur: 1_425,
     devise: 'XAF',
     disponible_at: '2026-10-22T10:00:00Z',
@@ -103,7 +105,7 @@ describe('LivraisonsService.creer', () => {
         expect(donnees.tarif).toBe(2_500);
     });
 
-    it("succès : la commission devient le prix client moins la part d'Ewuang", async () => {
+    it("succès : la commission devient le prix client moins la part d'Ewuang (remuneration_livreur, pas tarif)", async () => {
         const resultat = await f.service.creer(BOUTIQUE, DTO);
         expect(resultat.transmise).toBe(true);
         expect(f.prisma.livraison.update.mock.calls[0][0].data).toMatchObject({
