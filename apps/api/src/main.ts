@@ -6,7 +6,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 
 (async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` conserve les octets reçus dans `req.rawBody`, en plus du
+  // corps parsé. C'est indispensable à la vérification de la signature des
+  // webhooks Ewuang : le HMAC porte sur le corps BRUT, et re-sérialiser le JSON
+  // change les octets — ordre des clés, échappement des accents — donc invalide
+  // la signature. Le piège est silencieux : sur un corps simple, JSON.stringify
+  // rend parfois les mêmes octets et la vérification passe en développement
+  // avant de casser en production, au premier « Colis récupéré ».
+  //
+  // Voir src/ewuang/ewuang-signature.ts, qui refuse de travailler autrement
+  // qu'à partir d'un Buffer.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix('api/v1');
 
