@@ -4,6 +4,11 @@ import { LoginDto } from './authDto/login.dto.js';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { CreateUserDto } from './authDto/create_user.dto.js';
+import { UserRole } from '@prisma/client';
+
+// Hash bcrypt (coût 10) d'une valeur aléatoire jetée : sert seulement à donner
+// au login d'un e-mail inconnu la même durée qu'un vrai `bcrypt.compare`.
+const HASH_FACTICE = '$2b$10$sby6mQK/KKd0y6xcvUcJFOeX1LFmiQNow8vCIoU0uRFl4Piv2pRVO';
 
 
 @Injectable()
@@ -17,21 +22,17 @@ export class AuthService {
         // verifi si l'utilisateur existe
         const isUser = await this.usersService.findByEmail(LoginDto.email);
 
-        // si utilisateur n'existe pas
-        if (!isUser) {
-            throw new UnauthorizedException('Identifiants invalides');
-        }
+        // Le mot de passe est toujours comparé, même pour un e-mail inconnu
+        // (contre un hash factice) : sans cela, la durée de réponse dit si le
+        // compte existe. Le statut n'est examiné qu'après un mot de passe
+        // correct, et le refus reste le même message, pour qu'un tiers ne
+        // puisse pas savoir qu'un compte est suspendu.
+        const passwordMatches = await this.comparePassword(
+            LoginDto.password,
+            isUser?.password ?? HASH_FACTICE,
+        );
 
-        // si utilisateur existe on verifie si son statut est ACTIF
-        if (isUser.status !== "ACTIVE") {
-            throw new UnauthorizedException('Utilisateur non actif');
-        }
-
-        // On compare le mot de passe hashé avec celui fourni
-        const passwordMatches = await this.comparePassword(LoginDto.password, isUser.password);
-
-        // si le mot de passe est incorrect
-        if (!passwordMatches) {
+        if (!isUser || !passwordMatches || isUser.status !== "ACTIVE") {
             throw new UnauthorizedException('Identifiants invalides');
         }
 
@@ -44,17 +45,13 @@ export class AuthService {
     }
 
     async register(createUserDto: CreateUserDto) {
-        // controle si l'utilisateur existe deja
-        const isUser = await this.usersService.findByEmail(createUserDto.email);
-
-        // creer le nouvel utilisateur
-        const newUser: CreateUserDto = {
+        // L'inscription publique ne crée que des boutiques : les comptes ADMIN
+        // et LIVREUR se créent hors de cette route.
+        const resultUser = await this.usersService.create({
             email: createUserDto.email,
             password: await this.hashPassword(createUserDto.password),
-            role: createUserDto.role
-        }
-        // enregistrer le nouvel utilisateur
-        const resultUser = await this.usersService.create(newUser);
+            role: UserRole.BOUTIQUE,
+        });
 
         // genrer un token
         const payload = { sub: resultUser.id, email: resultUser.email, role: resultUser.role };

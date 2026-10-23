@@ -131,12 +131,18 @@ export class EwuangClient {
         const corps = texte ? safeJson(texte) : null;
 
         if (!reponse.ok) {
+            // Seul le champ `error` d'un corps JSON d'Ewuang est relayé à la
+            // boutique (ses messages de validation, en français, lui sont
+            // utiles). Une page HTML de proxy ou un corps inattendu reste dans
+            // le journal et n'atteint jamais l'écran.
+            const erreurEwuang = (corps as { error?: unknown } | null)?.error;
             const message =
-                (corps as { error?: string } | null)?.error ??
-                `Ewuang a répondu ${reponse.status}`;
+                typeof erreurEwuang === 'string' && erreurEwuang.length <= 300
+                    ? erreurEwuang
+                    : `Ewuang a répondu ${reponse.status}`;
 
             this.logger.warn(
-                `Ewuang ${reponse.status} sur ${init.method} ${chemin}: ${message}`,
+                `Ewuang ${reponse.status} sur ${init.method} ${chemin}: ${texte.slice(0, 500)}`,
             );
 
             // 401/403 = notre clé ou ses scopes, 429 = notre rythme : la
@@ -151,7 +157,9 @@ export class EwuangClient {
                     "L'accès à Ewuang est momentanément refusé. La course est enregistrée et sera renvoyée.",
                 );
             }
-            if (reponse.status === 429) {
+            // 408 (délai côté Ewuang) et 425 (trop tôt) disent « réessayez » :
+            // les traiter comme un refus annulerait définitivement la course.
+            if (reponse.status === 429 || reponse.status === 408 || reponse.status === 425) {
                 throw new ServiceUnavailableException(
                     'Ewuang limite momentanément les appels. La course est enregistrée et sera renvoyée.',
                 );
@@ -232,11 +240,14 @@ export class EwuangClient {
     }
 }
 
-/** Un corps non-JSON ne doit pas masquer le statut HTTP qui l'accompagne. */
+/**
+ * Un corps non-JSON ne doit pas masquer le statut HTTP qui l'accompagne. Il
+ * n'est pas recopié dans `error` : il finirait affiché à la boutique.
+ */
 function safeJson(texte: string): unknown {
     try {
         return JSON.parse(texte);
     } catch {
-        return { error: texte.slice(0, 500) };
+        return null;
     }
 }

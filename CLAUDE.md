@@ -151,7 +151,7 @@ Next 16 App Router, Tailwind v4 + primitives shadcn recopiées d'`ewuang-web` ([
 - **Session = le JWT de l'API dans un cookie httpOnly `fd_session`** ([lib/session.ts](apps/web/lib/session.ts)), qui expire avec le jeton. Pas de jeton de rafraîchissement côté API : reconnexion toutes les 30 min (`JWT_EXPIRES_IN`).
 - **Le navigateur n'appelle jamais l'API.** Tout passe par [lib/api.ts](apps/web/lib/api.ts) (`server-only`) depuis les Server Components et les Server Actions ([app/actions/](apps/web/app/actions/)). D'où `API_URL` sans `NEXT_PUBLIC_` (défaut en dev : `http://localhost:3001/api/v1`, obligatoire en prod) et aucun CORS à ouvrir.
 - Un 401 de l'API ou un jeton expiré/d'un autre rôle mène à **`/deconnexion`** (Route Handler) : un Server Component ne peut pas effacer de cookie, et sans ce détour `proxy.ts` renverrait vers l'espace en boucle.
-- L'inscription **impose `role: BOUTIQUE`** dans la Server Action : l'API accepte encore `ADMIN` (faille connue ci-dessous). La connexion refuse tout jeton d'un autre rôle.
+- L'inscription n'envoie **aucun rôle** : l'API crée toujours une `BOUTIQUE` (`auth.service.ts`) et rejette un champ `role` (`forbidNonWhitelisted`). La connexion refuse tout jeton d'un autre rôle.
 - **Formulaires : `onSubmit` + `startTransition`, jamais `<form action={…}>`** ([use-retour-action.ts](apps/web/components/use-retour-action.ts)). React 19 vide les champs d'un `<form action>` à chaque fin d'action, erreur comprise.
 - Règle UX : toute action serveur affiche l'**overlay plein écran** ([overlay-chargement.tsx](apps/web/components/overlay-chargement.tsx), 400 ms minimum) puis un toast sonner.
 - Le devis s'affiche en direct depuis `GET /tarifs`, chargé une fois côté serveur. Seul `tarif` est montré.
@@ -160,7 +160,6 @@ Next 16 App Router, Tailwind v4 + primitives shadcn recopiées d'`ewuang-web` ([
 
 ## Points connus à ne pas prendre pour des régressions
 
-- `POST /auth/register` est public et accepte `role` dans le corps, **`ADMIN` compris**. C'est une faille ouverte, pas encore traitée.
 - [test/app.e2e-spec.ts](apps/api/test/app.e2e-spec.ts) est le test du scaffold (`GET /` → « Hello World! ») : aucune route ne lui correspond, il échoue.
 - `pnpm lint` échoue sur [src/main.ts](apps/api/src/main.ts) (`no-floating-promises` : le bootstrap n'est pas attendu), et `users.*` / `auth.service.ts` portent des imports et variables inutilisés.
 - Sans `prisma generate`, `tsc` signale des dizaines d'erreurs sur `@prisma/client` (le script d'installation de Prisma est bloqué, voir plus haut). Ce n'est pas une régression du code.

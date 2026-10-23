@@ -28,6 +28,11 @@ const STATUT_PAR_TYPE: Record<string, string> = {
     'mission.annulee': 'Annulée',
 };
 
+/** La valeur si c'est une chaîne non vide, sinon `undefined`. */
+function texteOuUndefined(valeur: unknown): string | undefined {
+    return typeof valeur === 'string' && valeur.length > 0 ? valeur : undefined;
+}
+
 export interface EvenementEwuang {
     evenement_id: string;
     type: string;
@@ -179,7 +184,8 @@ export class EwuangWebhookService {
         // Le statut du contrat fait foi sur celui déduit du type : c'est Ewuang
         // qui le calcule, et le tableau local n'est qu'un repli pour un type
         // qui arriverait sans statut.
-        const statut = evenement.statut ?? STATUT_PAR_TYPE[evenement.type];
+        const statut =
+            texteOuUndefined(evenement.statut) ?? STATUT_PAR_TYPE[evenement.type];
         if (!statut) {
             await this.marquerIgnore(
                 evenement.evenement_id,
@@ -191,7 +197,7 @@ export class EwuangWebhookService {
             return;
         }
 
-        const donnees: Prisma.LivraisonUpdateInput = {
+        const donnees: Prisma.LivraisonUpdateManyMutationInput = {
             statutEwuang: statut,
             dernierEvenementAt: emisAt,
             missionEwuangId: evenement.mission_id,
@@ -201,13 +207,18 @@ export class EwuangWebhookService {
         // n'est jamais effacé : `mission.rendue` et `mission.annulee` n'ont pas
         // de livreur, et remettre les champs à null ferait perdre qui détenait
         // le colis juste avant.
-        if (evenement.livreur?.id) {
-            donnees.livreurEwuangId = evenement.livreur.id;
-            if (evenement.livreur.nom) donnees.livreurNom = evenement.livreur.nom;
-            if (evenement.livreur.contact)
-                donnees.livreurContact = evenement.livreur.contact;
-            if (evenement.livreur.type_vehicule)
-                donnees.livreurTypeVehicule = evenement.livreur.type_vehicule;
+        // Chaque champ est contrôlé avant d'atteindre Prisma : un type inattendu
+        // ferait échouer toute la mise à jour, et l'événement — déjà dédoublonné
+        // — serait perdu sans qu'Ewuang le renvoie jamais.
+        const livreurId = texteOuUndefined(evenement.livreur?.id);
+        if (livreurId) {
+            donnees.livreurEwuangId = livreurId;
+            const nom = texteOuUndefined(evenement.livreur?.nom);
+            const contact = texteOuUndefined(evenement.livreur?.contact);
+            const vehicule = texteOuUndefined(evenement.livreur?.type_vehicule);
+            if (nom) donnees.livreurNom = nom;
+            if (contact) donnees.livreurContact = contact;
+            if (vehicule) donnees.livreurTypeVehicule = vehicule;
         }
 
         // Jalons. `dateLivraison` vient de `livree_at` quand Ewuang le fournit :
@@ -218,28 +229,44 @@ export class EwuangWebhookService {
         } else if (evenement.type === 'mission.colis_recupere') {
             donnees.dateRecuperation = emisAt;
         } else if (evenement.type === 'mission.livree') {
-            donnees.dateLivraison = evenement.livree_at
-                ? new Date(evenement.livree_at)
-                : emisAt;
+            // Une date illisible retombe sur `emisAt` plutôt que de faire
+            // échouer la mise à jour : la course resterait sinon « en cours »
+            // alors que le colis est remis.
+            const livreeAt = new Date(texteOuUndefined(evenement.livree_at) ?? '');
+            donnees.dateLivraison = Number.isNaN(livreeAt.getTime()) ? emisAt : livreeAt;
         } else if (evenement.type === 'mission.annulee') {
             donnees.dateAnnulation = emisAt;
         }
 
-        if (evenement.motif) {
-            donnees.noteLivreur = evenement.motif;
+        const motif = texteOuUndefined(evenement.motif);
+        if (motif) {
+            donnees.noteLivreur = motif;
         }
 
         try {
-            await this.prisma.$transaction([
-                this.prisma.livraison.update({
-                    where: { id: course.id },
+            await this.prisma.$transaction(async (tx) => {
+                // La règle d'ordre est revérifiée DANS l'écriture : deux
+                // événements traités en parallèle ont pu lire tous deux l'ancien
+                // `dernierEvenementAt` plus haut, et le plus ancien écraserait
+                // alors le plus récent.
+                const { count } = await tx.livraison.updateMany({
+                    where: {
+                        id: course.id,
+                        OR: [
+                            { dernierEvenementAt: null },
+                            { dernierEvenementAt: { lt: emisAt } },
+                        ],
+                    },
                     data: donnees,
-                }),
-                this.prisma.evenementEwuangRecu.update({
+                });
+                await tx.evenementEwuangRecu.update({
                     where: { evenementId: evenement.evenement_id },
-                    data: { traiteAt: new Date() },
-                }),
-            ]);
+                    data:
+                        count === 1
+                            ? { traiteAt: new Date() }
+                            : { ignoreMotif: 'Dépassé par un événement plus récent appliqué entre-temps' },
+                });
+            });
         } catch (erreur) {
             this.logger.error(
                 `Application de l'événement ${evenement.evenement_id} échouée : ${(erreur as Error).message}`,

@@ -4,6 +4,7 @@ import { LoginDto } from './authDto/login.dto.js';
 import { CreateUserDto } from './authDto/create_user.dto.js';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator.js';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Authentification')
 @Controller('auth')
@@ -11,9 +12,10 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Enregistre un nouvel utilisateur (Admin, Boutique ou Livreur)' })
+  @ApiOperation({ summary: 'Crée un compte boutique' })
   @ApiResponse({ status: 201, description: 'Utilisateur créé avec succès.', type: CreateUserDto })
   @ApiResponse({ status: 400, description: "Erreur de validation ou données invalides." })
   async register(@Body() createUserDto: CreateUserDto) {
@@ -21,6 +23,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // par e-mail, voir ThrottlerParCompteGuard
   @Post("login")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Connecte un utilisateur' })

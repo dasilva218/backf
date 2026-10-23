@@ -8,7 +8,7 @@ import {
     UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator.js';
@@ -30,10 +30,12 @@ import {
  * par la signature HMAC, qui est plus forte qu'un jeton : elle authentifie le
  * CORPS, pas seulement l'appelant.
  *
- * **`@SkipThrottle()`** — le plafond global est de 100 requêtes par minute. Une
- * rafale de relances après un incident le dépasserait, chaque 429 serait vu par
- * Ewuang comme un échec, et provoquerait... d'autres relances. On se serait
- * infligé la panne soi-même.
+ * **Plafond large, pas de plafond nul** — le plafond global (100 par minute)
+ * serait dépassé par une rafale de relances après un incident : chaque 429 serait
+ * vu par Ewuang comme un échec et provoquerait d'autres relances. Mais aucun
+ * plafond du tout laissait n'importe qui marteler cette route publique (parsing
+ * et journalisation à chaque refus). 600 par minute et par IP couvre largement
+ * le débit d'Ewuang (cron toutes les minutes, lots bornés).
  *
  * **Pas de DTO.** Le `ValidationPipe` global tourne avec
  * `forbidNonWhitelisted: true` : un DTO strict rejetterait tout événement
@@ -55,7 +57,7 @@ export class EwuangWebhookController {
     ) { }
 
     @Public()
-    @SkipThrottle()
+    @Throttle({ default: { limit: 600, ttl: 60_000 } })
     @ApiExcludeEndpoint()
     @Post('webhook')
     @HttpCode(200)
@@ -76,9 +78,15 @@ export class EwuangWebhookController {
             // aide qui tâtonne. Côté Ewuang, un 401 est un échec définitif qui
             // s'épuise après ses dix tentatives, ce qui est le comportement
             // voulu face à un appelant non authentifié.
+            // L'en-tête vient d'un appelant non authentifié : tronqué et
+            // débarrassé des caractères de contrôle avant d'entrer dans le
+            // journal (taille et injection de fausses lignes).
+            const evenementJournal = evenementEntete
+                ?.replace(/[^\x20-\x7e]/g, '')
+                .slice(0, 64);
             this.logger.warn(
                 `Webhook refusé (${verdict.motif})` +
-                (evenementEntete ? ` — événement ${evenementEntete}` : ''),
+                (evenementJournal ? ` — événement ${evenementJournal}` : ''),
             );
             throw new UnauthorizedException('Signature invalide');
         }

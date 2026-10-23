@@ -1,5 +1,4 @@
-import { UserRole } from "@prisma/client";
-import { IsString, IsEmail, IsEnum, IsNotEmpty, MinLength } from "class-validator";
+import { IsString, IsEmail, IsNotEmpty, MaxLength, MinLength } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 
@@ -32,23 +31,16 @@ export class CreateUserDto {
     @IsString({
         message: 'Veuillez fournir un mot de passe valide'
     })
-    @MinLength(6, {
-        message: 'Le mot de passe doit contenir au moins 6 caractères'
+    @MinLength(10, {
+        message: 'Le mot de passe doit contenir au moins 10 caractères'
+    })
+    // bcrypt ignore tout au-delà de 72 octets : un plafond évite de laisser
+    // croire qu'un mot de passe plus long serait plus sûr, et borne le hachage.
+    @MaxLength(72, {
+        message: 'Le mot de passe ne doit pas dépasser 72 caractères'
     })
     password: string;
 
-
-    @ApiProperty({
-        example: "BOUTIQUE",
-        enum: UserRole,
-        description: "Rôle de l'utilisateur",
-        required: true
-    })
-    @IsEnum(UserRole, {
-        message: 'Veuillez fournir un rôle valide'
-    })
-    @IsNotEmpty({
-        message: 'Veuillez fournir un rôle'
-    })
-    role: UserRole;
+    // Pas de champ `role` : l'inscription publique crée toujours une BOUTIQUE.
+    // Un rôle lu dans le corps permettait à n'importe qui de s'inscrire ADMIN.
 }

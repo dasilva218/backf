@@ -52,20 +52,20 @@ export async function sInscrire(_etat: EtatAction, formData: FormData): Promise<
   if (!email || typeof password !== "string" || !password) {
     return { ok: false, message: "Saisissez votre e-mail et un mot de passe." };
   }
-  if (password.length < 6) {
-    return { ok: false, message: "Le mot de passe doit contenir au moins 6 caractères." };
+  if (password.length < 10) {
+    return { ok: false, message: "Le mot de passe doit contenir au moins 10 caractères." };
+  }
+  if (password.length > 72) {
+    return { ok: false, message: "Le mot de passe ne doit pas dépasser 72 caractères." };
   }
   if (password !== confirmation) {
     return { ok: false, message: "Les deux mots de passe ne correspondent pas." };
   }
 
-  // Le rôle est imposé ici, jamais lu dans le formulaire : l'API accepte
-  // encore `ADMIN` à l'inscription (faille connue, voir CLAUDE.md), et ce
-  // front ne doit pas servir à l'exploiter.
+  // Aucun rôle envoyé : l'API crée toujours une boutique et refuse ce champ.
   const reponse = await appelerApiPublique<ReponseAuth>("/auth/register", "POST", {
     email,
     password,
-    role: "BOUTIQUE",
   });
   if (!reponse.ok) {
     return { ok: false, message: reponse.message };

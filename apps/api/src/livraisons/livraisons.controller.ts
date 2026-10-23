@@ -11,6 +11,7 @@ import {
     Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { UserRole, type User } from '@prisma/client';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
@@ -29,6 +30,8 @@ export class LivraisonsController {
 
     @Post()
     @Roles(UserRole.BOUTIQUE)
+    // Chaque course dispatche un vrai livreur Ewuang : seau étroit, par compte.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Soumet une course, dispatchée à la flotte Ewuang',
         description:
@@ -68,6 +71,7 @@ export class LivraisonsController {
     }
 
     @Post(':id/renvoyer')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: "Rejoue la transmission d'une course non transmise à Ewuang",
         description: 'Sans risque de doublon : Ewuang est idempotent sur la référence de la course.',

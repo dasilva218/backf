@@ -24,12 +24,13 @@ export function FormulaireInscription() {
           name="password"
           type="password"
           autoComplete="new-password"
-          minLength={6}
+          minLength={10}
+          maxLength={72}
           required
           aria-describedby="aide-password"
         />
         <p id="aide-password" className="text-xs text-muted-foreground">
-          6 caractères minimum.
+          10 caractères minimum.
         </p>
       </div>
       <div className="flex flex-col gap-2">
@@ -39,7 +40,8 @@ export function FormulaireInscription() {
           name="confirmation"
           type="password"
           autoComplete="new-password"
-          minLength={6}
+          minLength={10}
+          maxLength={72}
           required
         />
       </div>

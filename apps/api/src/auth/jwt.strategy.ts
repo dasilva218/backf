@@ -29,7 +29,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
         const user = await this.usersService.findById(payload.sub);
 
-        if (!user) {
+        // Le statut est relu à chaque requête : un compte suspendu perd l'accès
+        // immédiatement, pas seulement à l'expiration de son jeton.
+        if (!user || user.status !== "ACTIVE") {
             throw new UnauthorizedException("Identifiants invalides");
         }
 
