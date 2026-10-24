@@ -2,32 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Banknote, Package, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LIENS = [
-  { href: "/admin/livreurs", libelle: "Livreurs" },
-  { href: "/admin/especes", libelle: "Espèces" },
-  { href: "/admin/courses", libelle: "Courses" },
+  { href: "/admin/livreurs", libelle: "Livreurs", icone: UsersRound },
+  { href: "/admin/especes", libelle: "Espèces", icone: Banknote },
+  { href: "/admin/courses", libelle: "Courses", icone: Package },
 ];
 
-export function NavigationAdmin() {
+/** Colonne dans la barre latérale (md et plus), ligne défilante en haut sur mobile. */
+export function NavigationAdmin({ orientation }: { orientation: "colonne" | "ligne" }) {
   const chemin = usePathname();
 
   return (
-    <nav aria-label="Navigation de l'administration" className="order-last -mx-1 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto">
-      {LIENS.map((lien) => {
-        const actif = chemin === lien.href || chemin.startsWith(`${lien.href}/`);
+    <nav
+      aria-label="Navigation de l'administration"
+      className={cn("flex gap-1", orientation === "colonne" ? "flex-col" : "-mx-1 overflow-x-auto")}
+    >
+      {LIENS.map(({ href, libelle, icone: Icone }) => {
+        const actif = chemin === href || chemin.startsWith(`${href}/`);
         return (
           <Link
-            key={lien.href}
-            href={lien.href}
+            key={href}
+            href={href}
             aria-current={actif ? "page" : undefined}
             className={cn(
-              "whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent",
+              "flex items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
               actif ? "bg-accent text-accent-foreground" : "text-muted-foreground",
             )}
           >
-            {lien.libelle}
+            <Icone className={cn("size-4", actif && "text-primary")} aria-hidden />
+            {libelle}
           </Link>
         );
       })}

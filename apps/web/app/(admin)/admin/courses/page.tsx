@@ -5,6 +5,7 @@ import { BadgeStatut } from "@/components/badge-statut";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { appelerApi } from "@/lib/api";
 import { formaterDate, formaterMontant, LIBELLES_TYPE } from "@/lib/affichage";
 import type { Flotte, LivraisonAdmin } from "@/lib/types";
@@ -68,46 +69,76 @@ function Liste({ donnees }: { donnees: PageAdmin }) {
   const pages = Math.max(1, Math.ceil(donnees.total / donnees.limite));
   return (
     <>
-      <ul className="flex flex-col gap-2">
-        {donnees.donnees.map((c) => {
-          const bloquee = c.flotte === "FIND_DELIVERY" && c.statut === "EN_COURS" && c.tentativesCode >= MAX_TENTATIVES_CODE;
-          return (
-            <li key={c.id}>
-              <Link
-                href={`/admin/courses/${c.id}`}
-                className="group flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:flex-row sm:items-center sm:gap-6"
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">
-                      {c.zoneDepart ?? "—"} → {c.zoneArrivee ?? "—"}
-                    </span>
-                    {c.typeCourse && <span className="text-xs text-muted-foreground">· {LIBELLES_TYPE[c.typeCourse]}</span>}
-                    {c.flotte && <Badge variant="outline">{LIBELLES_FLOTTE[c.flotte]}</Badge>}
-                    {bloquee && (
-                      <Badge variant="outline" className="border-destructive/40 text-destructive">
-                        <Lock aria-hidden />
-                        Code bloqué
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="truncate text-sm text-muted-foreground">
-                    Pour {c.destinataireNom ?? "—"} · {c.livreurNom ? `livreur ${c.livreurNom}` : "sans livreur"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {c.referenceExterne ?? c.id} · {formaterDate(c.dateDemande)}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between gap-4 sm:justify-end">
-                  <BadgeStatut livraison={c} />
-                  <span className="w-28 text-right text-sm font-semibold tabular-nums">{formaterMontant(c.tarif)}</span>
-                  <ArrowRight className="hidden size-4 text-muted-foreground sm:block" aria-hidden />
-                </div>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <Card className="gap-0 overflow-hidden py-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Trajet</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Flotte</TableHead>
+              <TableHead>Destinataire</TableHead>
+              <TableHead>Livreur</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead>Demandée le</TableHead>
+              <TableHead className="text-right">Prix</TableHead>
+              <TableHead>
+                <span className="sr-only">Ouvrir</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {donnees.donnees.map((c) => {
+              const bloquee =
+                c.flotte === "FIND_DELIVERY" && c.statut === "EN_COURS" && c.tentativesCode >= MAX_TENTATIVES_CODE;
+              const trajet = `${c.zoneDepart ?? "—"} → ${c.zoneArrivee ?? "—"}`;
+              return (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    <div className="flex min-w-40 flex-col">
+                      <Link href={`/admin/courses/${c.id}`} className="font-medium hover:text-primary hover:underline">
+                        {trajet}
+                      </Link>
+                      <span className="max-w-48 truncate text-xs text-muted-foreground" title={c.referenceExterne ?? c.id}>
+                        {c.referenceExterne ?? c.id}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {c.typeCourse ? LIBELLES_TYPE[c.typeCourse] : "—"}
+                  </TableCell>
+                  <TableCell>{c.flotte ? <Badge variant="outline">{LIBELLES_FLOTTE[c.flotte]}</Badge> : "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">{c.destinataireNom ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {c.livreurNom ?? <span className="text-muted-foreground">Aucun</span>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <BadgeStatut livraison={c} />
+                      {bloquee && (
+                        <Badge variant="outline" className="border-destructive/40 text-destructive">
+                          <Lock aria-hidden />
+                          Code bloqué
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formaterDate(c.dateDemande)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
+                    {formaterMontant(c.tarif)}
+                  </TableCell>
+                  <TableCell className="w-10">
+                    <Button asChild variant="ghost" size="icon" className="size-8">
+                      <Link href={`/admin/courses/${c.id}`} aria-label={`Ouvrir la course ${trajet}`}>
+                        <ArrowRight aria-hidden />
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
 
       {pages > 1 && (
         <nav aria-label="Pagination" className="flex items-center justify-between gap-4">

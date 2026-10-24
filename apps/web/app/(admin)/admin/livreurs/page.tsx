@@ -4,6 +4,7 @@ import { Bike, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { appelerApi } from "@/lib/api";
 import { formaterDate } from "@/lib/affichage";
 import { STATUTS_DOSSIER, type LivreurAdmin, type StatutDossier } from "@/lib/types";
@@ -78,52 +79,80 @@ export default async function PageLivreurs({ searchParams }: { searchParams: Pro
           </CardContent>
         </Card>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {reponse.donnees.map((l) => (
-            <li key={l.id}>
-              <Card>
-                <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Livreur</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>Véhicule</TableHead>
+                <TableHead>Zones</TableHead>
+                <TableHead>Dossier</TableHead>
+                <TableHead>Inscrit le</TableHead>
+                <TableHead className="text-right">Livraisons</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reponse.donnees.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell>
+                    <div className="flex min-w-44 flex-col">
                       <span className="font-medium">
                         {l.firstname} {l.lastname}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          l.statutDossier === "VALIDE" && "border-primary/40 text-primary",
-                          l.statutDossier === "REFUSE" && "border-destructive/40 text-destructive",
-                        )}
-                      >
-                        {LIBELLES_DOSSIER[l.statutDossier]}
-                      </Badge>
-                      {l.user.status !== "ACTIVE" && (
-                        <Badge variant="outline" className="border-destructive/40 text-destructive">
-                          Compte {l.user.status.toLowerCase()}
-                        </Badge>
-                      )}
+                      <span className="text-xs text-muted-foreground">{l.user.email}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {[l.phoneAirtel, l.phoneMoov].filter(Boolean).join(" · ") || "Sans téléphone"} · {l.user.email}
-                    </p>
-                    <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                      <Bike className="size-4" aria-hidden />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums">
+                    {[l.phoneAirtel, l.phoneMoov].filter(Boolean).join(" · ") || "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span className="flex items-center gap-1.5">
+                      <Bike className="size-4 text-muted-foreground" aria-hidden />
                       {VEHICULES[l.moyenTransport] ?? l.moyenTransport}
-                      {l.immatriculation ? ` · ${l.immatriculation}` : ""} · Zones : {l.zoneGeographique.join(", ") || "toutes"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Inscrit le {formaterDate(l.createdAt)}
-                      {l.dossierTraiteAt ? ` · traité le ${formaterDate(l.dossierTraiteAt)}` : ""}
-                      {l.statutDossier === "VALIDE" ? ` · ${l.nombreLivraisons} livraison${l.nombreLivraisons > 1 ? "s" : ""}` : ""}
-                    </p>
-                    {l.motifRefus && <p className="text-sm text-destructive">Motif : {l.motifRefus}</p>}
-                  </div>
-                  <ActionsDossier livreurId={l.id} nom={`${l.firstname} ${l.lastname}`} statut={l.statutDossier} />
-                </CardContent>
-              </Card>
-            </li>
-          ))}
-        </ul>
+                    </span>
+                    {l.immatriculation && <span className="block text-xs text-muted-foreground">{l.immatriculation}</span>}
+                  </TableCell>
+                  <TableCell className="max-w-48 text-muted-foreground">{l.zoneGeographique.join(", ") || "Toutes"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col items-start gap-1">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            l.statutDossier === "VALIDE" && "border-primary/40 text-primary",
+                            l.statutDossier === "REFUSE" && "border-destructive/40 text-destructive",
+                          )}
+                        >
+                          {LIBELLES_DOSSIER[l.statutDossier]}
+                        </Badge>
+                        {l.user.status !== "ACTIVE" && (
+                          <Badge variant="outline" className="border-destructive/40 text-destructive">
+                            Compte {l.user.status.toLowerCase()}
+                          </Badge>
+                        )}
+                      </div>
+                      {l.motifRefus && <span className="max-w-56 text-xs text-destructive">Motif : {l.motifRefus}</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {formaterDate(l.createdAt)}
+                    {l.dossierTraiteAt && <span className="block text-xs">traité le {formaterDate(l.dossierTraiteAt)}</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {l.statutDossier === "VALIDE" ? l.nombreLivraisons : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <ActionsDossier livreurId={l.id} nom={`${l.firstname} ${l.lastname}`} statut={l.statutDossier} />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   );

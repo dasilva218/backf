@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { appelerApi, type ReponseApi } from "@/lib/api";
 import { formaterDate, formaterMontant, LIBELLES_TYPE_CLIENT } from "@/lib/affichage";
 import type { DuClient, EncoursLivreur, MouvementEspeces, ReleveEwuang } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { FormulaireReglement } from "./formulaire-reglement";
 
 export const metadata: Metadata = { title: "Espèces" };
@@ -47,141 +49,216 @@ export default async function PageEspeces() {
         </p>
       </div>
 
-      <Section titre="Livreurs" description="Espèces que nos livreurs détiennent. Au-delà de 50 000 FCFA ou après 48 h sans versement, ils ne reçoivent plus de nouvelle course." reponse={livreurs}>
+      <Synthese livreurs={livreurs} clients={clients} ewuang={ewuang} />
+
+      <Section
+        titre="Livreurs"
+        description="Espèces que nos livreurs détiennent. Au-delà de 50 000 FCFA ou après 48 h sans versement, ils ne reçoivent plus de nouvelle course."
+        reponse={livreurs}
+      >
         {(lignes) =>
           lignes.length === 0 ? (
             <Vide texte="Aucun livreur n'a encore manipulé d'espèces." />
           ) : (
-            <ul className="divide-y">
-              {lignes.map((l) => {
-                const nom = l.livreur ? `${l.livreur.firstname} ${l.livreur.lastname}` : "Livreur inconnu";
-                const id = l.livreur?.id;
-                return (
-                  <li key={id ?? nom} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="font-medium">{nom}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {l.solde > 0
-                          ? `Doit ${formaterMontant(l.solde)}${l.echeance ? ` · avant le ${formaterDate(l.echeance)}` : ""}`
-                          : l.solde < 0
-                            ? `find_delivery lui doit ${formaterMontant(-l.solde)}`
-                            : "Soldé"}
-                      </span>
-                      {l.blocage && (
-                        <span className="flex items-start gap-1 text-sm text-destructive">
-                          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                          {l.blocage}
-                        </span>
-                      )}
-                    </div>
-                    {id && l.solde > 0 && (
-                      <FormulaireReglement
-                        type="versement"
-                        compteId={id}
-                        libelle="Enregistrer un versement"
-                        titre={`Versement de ${nom}`}
-                        description="Le livreur remet des espèces au bureau."
-                        maximum={l.solde}
-                      />
-                    )}
-                    {id && l.solde < 0 && (
-                      <FormulaireReglement
-                        type="paiement"
-                        compteId={id}
-                        libelle="Payer le livreur"
-                        titre={`Paiement à ${nom}`}
-                        description="Le bureau paie ce que find_delivery doit au livreur (un retour qui a coûté plus que la course)."
-                        maximum={-l.solde}
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Livreur</TableHead>
+                  <TableHead className="text-right">Solde</TableHead>
+                  <TableHead>À verser avant le</TableHead>
+                  <TableHead>État</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lignes.map((l) => {
+                  const nom = l.livreur ? `${l.livreur.firstname} ${l.livreur.lastname}` : "Livreur inconnu";
+                  const id = l.livreur?.id;
+                  return (
+                    <TableRow key={id ?? nom}>
+                      <TableCell className="whitespace-nowrap font-medium">{nom}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">
+                        <Solde valeur={l.solde} positif="doit" negatif="lui est dû" />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {l.solde > 0 && l.echeance ? formaterDate(l.echeance) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {l.blocage ? (
+                          <span className="flex max-w-72 items-start gap-1 text-destructive">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            {l.blocage}
+                          </span>
+                        ) : (
+                          <Badge variant="outline" className="border-primary/40 text-primary">
+                            Peut rouler
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {id && l.solde > 0 && (
+                          <FormulaireReglement
+                            type="versement"
+                            compteId={id}
+                            libelle="Enregistrer un versement"
+                            titre={`Versement de ${nom}`}
+                            description="Le livreur remet des espèces au bureau."
+                            maximum={l.solde}
+                          />
+                        )}
+                        {id && l.solde < 0 && (
+                          <FormulaireReglement
+                            type="paiement"
+                            compteId={id}
+                            libelle="Payer le livreur"
+                            titre={`Paiement à ${nom}`}
+                            description="Le bureau paie ce que find_delivery doit au livreur (un retour qui a coûté plus que la course)."
+                            maximum={-l.solde}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )
         }
       </Section>
 
-      <Section titre="Clients" description="Prix des marchandises encaissé à la remise, par nos livreurs ou ceux d'Ewuang, et pas encore reversé." reponse={clients}>
+      <Section
+        titre="Clients"
+        description="Prix des marchandises encaissé à la remise, par nos livreurs ou ceux d'Ewuang, et pas encore reversé."
+        reponse={clients}
+      >
         {(lignes) =>
           lignes.length === 0 ? (
             <Vide texte="Aucune marchandise à reverser." />
           ) : (
-            <ul className="divide-y">
-              {lignes.map((c) => {
-                const nom = c.client
-                  ? c.client.raisonSociale || `${c.client.firstname} ${c.client.lastname}`
-                  : "Client inconnu";
-                return (
-                  <li key={c.client?.id ?? nom} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="flex flex-wrap items-center gap-2 font-medium">
-                        {nom}
-                        {c.client && <Badge variant="outline">{LIBELLES_TYPE_CLIENT[c.client.type]}</Badge>}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        À reverser : {formaterMontant(c.du)}
-                        {c.client ? ` · ${[c.client.phoneAirtel, c.client.phoneMoov].filter(Boolean).join(" · ")}` : ""}
-                      </span>
-                    </div>
-                    {c.client && c.du > 0 && (
-                      <FormulaireReglement
-                        type="reversement"
-                        compteId={c.client.id}
-                        libelle="Reverser"
-                        titre={`Reversement à ${nom}`}
-                        description="Le bureau remet au client le prix de ses marchandises."
-                        maximum={c.du}
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Client</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Téléphone</TableHead>
+                  <TableHead className="text-right">À reverser</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lignes.map((c) => {
+                  const nom = c.client
+                    ? c.client.raisonSociale || `${c.client.firstname} ${c.client.lastname}`
+                    : "Client inconnu";
+                  return (
+                    <TableRow key={c.client?.id ?? nom}>
+                      <TableCell className="whitespace-nowrap font-medium">{nom}</TableCell>
+                      <TableCell>
+                        {c.client ? <Badge variant="outline">{LIBELLES_TYPE_CLIENT[c.client.type]}</Badge> : "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                        {c.client ? [c.client.phoneAirtel, c.client.phoneMoov].filter(Boolean).join(" · ") || "—" : "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
+                        {formaterMontant(c.du)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.client && c.du > 0 && (
+                          <FormulaireReglement
+                            type="reversement"
+                            compteId={c.client.id}
+                            libelle="Reverser"
+                            titre={`Reversement à ${nom}`}
+                            description="Le bureau remet au client le prix de ses marchandises."
+                            maximum={c.du}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )
         }
       </Section>
 
-      <Section titre="Ewuang" description="Ce que les livreurs Ewuang ont encaissé sur nos courses, moins ce que ces courses lui coûtent : c'est le relevé entre Ewuang et find_delivery." reponse={ewuang}>
-        {(releve) => (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-lg font-semibold tabular-nums">
-                {releve.du > 0
-                  ? `Ewuang nous doit ${formaterMontant(releve.du)}`
-                  : releve.du < 0
-                    ? `Nous devons ${formaterMontant(-releve.du)} à Ewuang`
-                    : "Relevé soldé"}
-              </p>
-              {releve.du > 0 && (
-                <FormulaireReglement
-                  type="ewuangRecu"
-                  compteId="ewuang"
-                  libelle="Enregistrer son règlement"
-                  titre="Règlement reçu d'Ewuang"
-                  description="Ewuang remet ce que ses livreurs ont encaissé pour nous."
-                  maximum={releve.du}
-                />
-              )}
-              {releve.du < 0 && (
-                <FormulaireReglement
-                  type="ewuangVerse"
-                  compteId="ewuang"
-                  libelle="Enregistrer notre règlement"
-                  titre="Règlement versé à Ewuang"
-                  description="Nous réglons ce que nos courses ont coûté à Ewuang au-delà de ce qu'il a encaissé."
-                  maximum={-releve.du}
-                />
-              )}
-            </div>
-            <ListeMouvements mouvements={releve.mouvements} vide="Aucun mouvement avec Ewuang." />
-          </div>
-        )}
+      <Section
+        titre="Ewuang"
+        description="Ce que les livreurs Ewuang ont encaissé sur nos courses, moins ce que ces courses lui coûtent : c'est le relevé entre Ewuang et find_delivery."
+        reponse={ewuang}
+        action={(releve) =>
+          releve.du > 0 ? (
+            <FormulaireReglement
+              type="ewuangRecu"
+              compteId="ewuang"
+              libelle="Enregistrer son règlement"
+              titre="Règlement reçu d'Ewuang"
+              description="Ewuang remet ce que ses livreurs ont encaissé pour nous."
+              maximum={releve.du}
+            />
+          ) : releve.du < 0 ? (
+            <FormulaireReglement
+              type="ewuangVerse"
+              compteId="ewuang"
+              libelle="Enregistrer notre règlement"
+              titre="Règlement versé à Ewuang"
+              description="Nous réglons ce que nos courses ont coûté à Ewuang au-delà de ce qu'il a encaissé."
+              maximum={-releve.du}
+            />
+          ) : null
+        }
+      >
+        {(releve) => <TableMouvements mouvements={releve.mouvements} vide="Aucun mouvement avec Ewuang." />}
       </Section>
 
       <Section titre="Journal" description="Les 50 derniers mouvements, tous comptes confondus." reponse={journal}>
-        {(mouvements) => <ListeMouvements mouvements={mouvements} vide="Le registre est vide." />}
+        {(mouvements) => <TableMouvements mouvements={mouvements} vide="Le registre est vide." />}
       </Section>
+    </div>
+  );
+}
+
+/** Les trois montants que le bureau suit au quotidien ; une lecture en échec affiche « — ». */
+function Synthese({
+  livreurs,
+  clients,
+  ewuang,
+}: {
+  livreurs: ReponseApi<EncoursLivreur[]>;
+  clients: ReponseApi<DuClient[]>;
+  ewuang: ReponseApi<ReleveEwuang>;
+}) {
+  const detenu = livreurs.ok ? livreurs.donnees.reduce((s, l) => s + Math.max(0, l.solde), 0) : null;
+  const bloques = livreurs.ok ? livreurs.donnees.filter((l) => l.blocage).length : null;
+  const aReverser = clients.ok ? clients.donnees.reduce((s, c) => s + c.du, 0) : null;
+  const releve = ewuang.ok ? ewuang.donnees.du : null;
+
+  const tuiles = [
+    {
+      libelle: "Détenu par nos livreurs",
+      valeur: detenu,
+      detail: bloques ? `${bloques} livreur${bloques > 1 ? "s" : ""} bloqué${bloques > 1 ? "s" : ""}` : "Aucun livreur bloqué",
+      alerte: Boolean(bloques),
+    },
+    { libelle: "À reverser aux clients", valeur: aReverser, detail: "Prix des marchandises", alerte: false },
+    {
+      libelle: releve !== null && releve < 0 ? "Dû à Ewuang" : "Dû par Ewuang",
+      valeur: releve === null ? null : Math.abs(releve),
+      detail: "Relevé entre les deux flottes",
+      alerte: false,
+    },
+  ];
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-3">
+      {tuiles.map((t) => (
+        <Card key={t.libelle} className="gap-1 px-5 py-4">
+          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t.libelle}</span>
+          <span className="text-2xl font-semibold tabular-nums">{t.valeur === null ? "—" : formaterMontant(t.valeur)}</span>
+          <span className={cn("text-xs text-muted-foreground", t.alerte && "text-destructive")}>{t.detail}</span>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -190,56 +267,80 @@ function Section<T>({
   titre,
   description,
   reponse,
+  action,
   children,
 }: {
   titre: string;
   description: string;
   reponse: ReponseApi<T>;
+  action?: (donnees: T) => React.ReactNode;
   children: (donnees: T) => React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{titre}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+    <Card className="gap-4 overflow-hidden pb-0">
+      <CardHeader className="sm:grid-cols-[1fr_auto]">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle className="text-base">{titre}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        {reponse.ok && action && <div className="sm:row-span-2 sm:self-center">{action(reponse.donnees)}</div>}
       </CardHeader>
-      <CardContent>
+      <div className="border-t">
         {reponse.ok ? (
           children(reponse.donnees)
         ) : (
-          <p className="text-sm text-destructive">Lecture impossible : {reponse.message}</p>
+          <p className="px-6 py-4 text-sm text-destructive">Lecture impossible : {reponse.message}</p>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
 
 function Vide({ texte }: { texte: string }) {
-  return <p className="py-4 text-center text-sm text-muted-foreground">{texte}</p>;
+  return <p className="px-6 py-6 text-center text-sm text-muted-foreground">{texte}</p>;
 }
 
-function ListeMouvements({ mouvements, vide }: { mouvements: MouvementEspeces[]; vide: string }) {
+/** Un solde signé : positif = le compte doit au bureau, négatif = le bureau lui doit. */
+function Solde({ valeur, positif, negatif }: { valeur: number; positif: string; negatif: string }) {
+  if (valeur === 0) return <span className="text-muted-foreground">Soldé</span>;
+  return (
+    <span className="flex flex-col items-end">
+      <span className="font-semibold">{formaterMontant(Math.abs(valeur))}</span>
+      <span className="text-xs text-muted-foreground">{valeur > 0 ? positif : negatif}</span>
+    </span>
+  );
+}
+
+function TableMouvements({ mouvements, vide }: { mouvements: MouvementEspeces[]; vide: string }) {
   if (mouvements.length === 0) return <Vide texte={vide} />;
   return (
-    <ul className="divide-y text-sm">
-      {mouvements.map((m) => (
-        <li key={m.id} className="flex items-start justify-between gap-4 py-2">
-          <div className="flex min-w-0 flex-col">
-            <span>{LIBELLES_MOUVEMENT[m.type] ?? m.type}</span>
-            <span className="text-xs text-muted-foreground">
-              {[
-                m.referenceCourse ? `Course ${m.referenceCourse}` : null,
-                m.recu ? `Reçu ${m.recu}` : null,
-                m.note,
-                formaterDate(m.createdAt),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          </div>
-          <span className="shrink-0 font-medium tabular-nums">{formaterMontant(m.montant)}</span>
-        </li>
-      ))}
-    </ul>
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead>Date</TableHead>
+          <TableHead>Mouvement</TableHead>
+          <TableHead>Course</TableHead>
+          <TableHead>Reçu</TableHead>
+          <TableHead>Note</TableHead>
+          <TableHead className="text-right">Montant</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {mouvements.map((m) => (
+          <TableRow key={m.id}>
+            <TableCell className="whitespace-nowrap text-muted-foreground">{formaterDate(m.createdAt)}</TableCell>
+            <TableCell className="whitespace-nowrap">{LIBELLES_MOUVEMENT[m.type] ?? m.type}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground">{m.referenceCourse ?? "—"}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground">{m.recu ?? "—"}</TableCell>
+            <TableCell className="max-w-64 truncate text-muted-foreground" title={m.note ?? undefined}>
+              {m.note ?? "—"}
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
+              {formaterMontant(m.montant)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
