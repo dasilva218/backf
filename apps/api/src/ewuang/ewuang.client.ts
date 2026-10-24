@@ -38,6 +38,20 @@ export interface CreerMissionEntree {
     destinataire: { nom: string; adresse: string; contact: string };
     colis: { description: string; vehicule_requis?: VehiculeRequis };
     date_souhaitee?: string;
+    /**
+     * Encaissement en espèces (v2 du contrat, §2). Ignoré par un Ewuang encore
+     * en v1 : son schéma écarte les champs qu'il ne connaît pas.
+     */
+    paiement?: PaiementMission;
+}
+
+export interface PaiementMission {
+    mode: 'especes';
+    payeur: 'expediteur' | 'destinataire';
+    /** Prix payé par NOTRE client, à encaisser auprès du payeur. */
+    frais: number;
+    /** Contre-remboursement, toujours payé par le destinataire à la remise. */
+    montant_marchandise: number;
 }
 
 export interface MissionCreee {

@@ -10,11 +10,12 @@ import { RolesGuard } from './auth/guards/roles.guard.js';
 import { ThrottlerParCompteGuard } from './auth/guards/throttler-par-compte.guard.js';
 import { EwuangModule } from './ewuang/ewuang.module.js';
 import { TarifsModule } from './tarifs/tarifs.module.js';
-import { BoutiquesModule } from './boutiques/boutiques.module.js';
+import { ClientsModule } from './clients/clients.module.js';
 import { LivraisonsModule } from './livraisons/livraisons.module.js';
+import { LivreursModule } from './livreurs/livreurs.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]), UsersModule, PrismaModule, AuthModule, EwuangModule, TarifsModule, BoutiquesModule, LivraisonsModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]), UsersModule, PrismaModule, AuthModule, EwuangModule, TarifsModule, ClientsModule, LivraisonsModule, LivreursModule],
   controllers: [],
   providers: [
     // L'ordre compte : le limiteur compte par compte, il a besoin de `req.user`.

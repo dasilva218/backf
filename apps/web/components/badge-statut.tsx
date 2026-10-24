@@ -16,7 +16,7 @@ export function BadgeStatut({
   livraison,
   className,
 }: {
-  livraison: Pick<Livraison, "statut" | "statutEwuang" | "missionEwuangId">;
+  livraison: Pick<Livraison, "statut" | "statutEwuang" | "missionEwuangId" | "flotte">;
   className?: string;
 }) {
   const { libelle, ton } = statutAffiche(livraison);

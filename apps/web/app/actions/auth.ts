@@ -34,10 +34,10 @@ export async function seConnecter(_etat: EtatAction, formData: FormData): Promis
     };
   }
 
-  // Cet espace est celui des boutiques. Un compte ADMIN ou LIVREUR obtiendrait
+  // Cet espace est celui des clients. Un compte ADMIN ou LIVREUR obtiendrait
   // un jeton valide, mais chaque écran lui répondrait 403 ou vide.
-  if (lireChargeJeton(reponse.donnees.accessToken)?.role !== "BOUTIQUE") {
-    return { ok: false, message: "Cet espace est réservé aux comptes boutique." };
+  if (lireChargeJeton(reponse.donnees.accessToken)?.role !== "CLIENT") {
+    return { ok: false, message: "Cet espace est réservé aux comptes client." };
   }
 
   await ouvrirSession(reponse.donnees.accessToken);
@@ -62,7 +62,7 @@ export async function sInscrire(_etat: EtatAction, formData: FormData): Promise<
     return { ok: false, message: "Les deux mots de passe ne correspondent pas." };
   }
 
-  // Aucun rôle envoyé : l'API crée toujours une boutique et refuse ce champ.
+  // Aucun rôle envoyé : l'API crée toujours un client et refuse ce champ.
   const reponse = await appelerApiPublique<ReponseAuth>("/auth/register", "POST", {
     email,
     password,

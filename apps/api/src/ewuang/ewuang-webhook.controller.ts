@@ -1,4 +1,6 @@
 import {
+    BadRequestException,
+    ConflictException,
     Controller,
     Headers,
     HttpCode,
@@ -12,6 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator.js';
+import { EwuangReservationService, type DemandeReservation } from './ewuang-reservation.service.js';
 import { verifierSignatureEwuang } from './ewuang-signature.js';
 import {
     EwuangWebhookService,
@@ -54,6 +57,7 @@ export class EwuangWebhookController {
     constructor(
         private readonly config: ConfigService,
         private readonly webhooks: EwuangWebhookService,
+        private readonly reservations: EwuangReservationService,
     ) { }
 
     @Public()
@@ -119,5 +123,44 @@ export class EwuangWebhookController {
         });
 
         return { recu: true };
+    }
+
+    /**
+     * Réservation d'une course par un livreur Ewuang (v2 du contrat, §1).
+     *
+     * Même signature que les webhooks. Contrairement à eux, la réponse PORTE
+     * la décision et se calcule avant de répondre : 200 = réservée, 409 =
+     * refusée. Ewuang n'attribue rien sans 200, et abandonne au bout de 5 s.
+     */
+    @Public()
+    @Throttle({ default: { limit: 600, ttl: 60_000 } })
+    @ApiExcludeEndpoint()
+    @Post('reservations')
+    @HttpCode(200)
+    async reserver(
+        @Req() requete: Request & { rawBody?: Buffer },
+        @Headers('x-ewuang-signature') signature?: string,
+    ): Promise<{ reservee: true }> {
+        const verdict = verifierSignatureEwuang(
+            requete.rawBody,
+            signature,
+            this.config.get<string>('EWUANG_WEBHOOK_SECRET'),
+        );
+        if (!verdict.valide) {
+            this.logger.warn(`Réservation refusée (${verdict.motif})`);
+            throw new UnauthorizedException('Signature invalide');
+        }
+
+        let demande: DemandeReservation;
+        try {
+            demande = JSON.parse(requete.rawBody!.toString('utf8'));
+        } catch {
+            throw new BadRequestException('Corps JSON illisible');
+        }
+
+        if (!(await this.reservations.reserver(demande))) {
+            throw new ConflictException('Course déjà prise par une autre flotte, ou annulée');
+        }
+        return { reservee: true };
     }
 }

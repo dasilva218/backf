@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { appelerApi } from "@/lib/api";
 import {
+  calculerEncaissements,
   estAnnulable,
   estARenvoyer,
   formaterDate,
@@ -40,12 +41,21 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
   const course = reponse.donnees;
   const charge = course.chargeEwuang;
   const annulee = course.statut === "ANNULEE";
+  // Null pour une course réglée hors course (créée avant le paiement en espèces).
+  const encaissements =
+    course.payeur && course.tarif != null
+      ? calculerEncaissements(course.tarif, course.payeur, course.montantMarchandise)
+      : null;
 
   const etapes = [
     { libelle: "Demandée", date: course.dateDemande },
     { libelle: "Acceptée par un livreur", date: course.dateAcceptation },
     { libelle: "Colis récupéré", date: course.dateRecuperation },
-    { libelle: "Livrée", date: course.dateLivraison },
+    // Un colis revenu à l'expéditeur n'a jamais été livré : l'étape cède la
+    // place au retour.
+    ...(course.dateRetour
+      ? [{ libelle: "Rendu à l'expéditeur", date: course.dateRetour }]
+      : [{ libelle: "Livrée", date: course.dateLivraison }]),
     ...(course.dateAnnulation ? [{ libelle: "Annulée", date: course.dateAnnulation }] : []),
   ];
 
@@ -150,6 +160,27 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
             {charge?.date_souhaitee && (
               <Bloc titre="Date souhaitée">
                 <p>{formaterDate(charge.date_souhaitee)}</p>
+              </Bloc>
+            )}
+            {encaissements && (
+              <Bloc titre="Paiement en espèces, au livreur">
+                {encaissements.enlevement > 0 && (
+                  <p>
+                    {formaterMontant(encaissements.enlevement)} par l&apos;expéditeur, à l&apos;enlèvement
+                  </p>
+                )}
+                {encaissements.remise > 0 && (
+                  <p>
+                    {formaterMontant(encaissements.remise)} par le destinataire, à la remise
+                    {course.montantMarchandise > 0 && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        (dont {formaterMontant(course.montantMarchandise)} pour la marchandise, que nous vous
+                        reversons)
+                      </span>
+                    )}
+                  </p>
+                )}
               </Bloc>
             )}
           </CardContent>

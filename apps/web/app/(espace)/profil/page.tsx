@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { appelerApi } from "@/lib/api";
-import type { ProfilBoutique } from "@/lib/types";
+import type { ProfilClient } from "@/lib/types";
 import { FormulaireProfil } from "./formulaire";
 
 export const metadata: Metadata = { title: "Profil" };
@@ -14,7 +14,7 @@ export default async function PageProfil({
   searchParams: Promise<{ bienvenue?: string }>;
 }) {
   const { bienvenue } = await searchParams;
-  const reponse = await appelerApi<ProfilBoutique>("/boutiques/moi");
+  const reponse = await appelerApi<ProfilClient>("/clients/moi");
 
   // 404 = profil pas encore créé : formulaire vide, c'est le cas normal
   // juste après l'inscription.
@@ -55,7 +55,10 @@ export default async function PageProfil({
       <Card>
         <CardHeader>
           <CardTitle>Informations</CardTitle>
-          <CardDescription>Le prénom et le nom sont obligatoires.</CardDescription>
+          <CardDescription>
+            Le type de compte, le prénom et le nom sont obligatoires, ainsi que le nom de l&apos;entreprise
+            ou de la boutique.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <FormulaireProfil profil={profil} />

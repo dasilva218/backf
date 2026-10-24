@@ -41,6 +41,6 @@ export class CreateUserDto {
     })
     password: string;
 
-    // Pas de champ `role` : l'inscription publique crée toujours une BOUTIQUE.
+    // Pas de champ `role` : l'inscription publique crée toujours un CLIENT.
     // Un rôle lu dans le corps permettait à n'importe qui de s'inscrire ADMIN.
 }

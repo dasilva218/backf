@@ -1,13 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+    IsDefined,
     IsIn,
+    IsInt,
     IsISO8601,
     IsNotEmpty,
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
+    Min,
     ValidateNested,
 } from 'class-validator';
 import type { TypeCourse, VehiculeRequis } from '../ewuang/ewuang.client.js';
@@ -22,7 +26,24 @@ import { TYPES_COURSE, ZONES, type Zone } from '../tarifs/grille-tarifs.js';
  * course.
  */
 
-const VEHICULES = ['moto', 'voiture', 'camionnette'] as const satisfies readonly VehiculeRequis[];
+/**
+ * `camionnette` est retirée pour l'instant (décision de Franck, 2026-10-24).
+ * Un livreur peut toujours s'inscrire avec une camionnette (`livreurs/vehicules.ts`).
+ */
+const VEHICULES = ['moto', 'voiture'] as const satisfies readonly VehiculeRequis[];
+
+/** Le vocabulaire de la v2 du contrat Ewuang (`paiement.payeur`). */
+export const PAYEURS = ['expediteur', 'destinataire'] as const;
+export type PayeurDemande = (typeof PAYEURS)[number];
+
+/**
+ * Plafond du contre-remboursement, en FCFA (règle R6 du plan de lancement).
+ *
+ * Égal au plafond d'encours d'un livreur (R5) : au-delà, aucun livreur ne
+ * pourrait accepter la course. Constante en attendant la table de paramètres
+ * de la phase 3, qui le rendra réglable sans redéploiement.
+ */
+export const PLAFOND_MARCHANDISE = 50_000;
 
 const MESSAGE_ZONE = `Veuillez fournir une zone valide : ${ZONES.join(', ')}`;
 
@@ -32,7 +53,7 @@ const nettoyer = ({ value }: { value: unknown }) =>
 export class EnlevementDto {
     @ApiPropertyOptional({
         example: 'Quartier Louis, en face de la pharmacie du Rond-Point',
-        description: "Adresse d'enlèvement. Absente : l'adresse du profil boutique.",
+        description: "Adresse d'enlèvement. Absente : l'adresse du profil client.",
     })
     @IsOptional()
     @Transform(nettoyer)
@@ -43,7 +64,7 @@ export class EnlevementDto {
 
     @ApiPropertyOptional({
         example: '+24107112233',
-        description: "Téléphone de l'expéditeur. Absent : un téléphone du profil boutique.",
+        description: "Téléphone de l'expéditeur. Absent : un téléphone du profil client.",
     })
     @IsOptional()
     @Transform(nettoyer)
@@ -106,6 +127,30 @@ export class ColisDto {
     vehicule_requis?: VehiculeRequis;
 }
 
+export class PaiementDto {
+    @ApiProperty({
+        enum: PAYEURS,
+        description:
+            "Qui paie les frais, en espèces, au livreur : l'expéditeur à l'enlèvement, ou le destinataire à la remise.",
+    })
+    @IsIn(PAYEURS, {
+        message: `Veuillez indiquer qui paie la course : ${PAYEURS.join(' ou ')}`,
+    })
+    payeur: PayeurDemande;
+
+    @ApiPropertyOptional({
+        example: 15000,
+        description: `Prix de la marchandise, encaissé auprès du destinataire à la remise, pour votre compte. Entier FCFA, ${PLAFOND_MARCHANDISE} au plus. Absent ou 0 : aucun.`,
+    })
+    @IsOptional()
+    @IsInt({ message: 'Le montant de la marchandise doit être un nombre entier de FCFA' })
+    @Min(0, { message: 'Le montant de la marchandise ne peut pas être négatif' })
+    @Max(PLAFOND_MARCHANDISE, {
+        message: `Le montant de la marchandise ne peut pas dépasser ${PLAFOND_MARCHANDISE} FCFA`,
+    })
+    montant_marchandise?: number;
+}
+
 export class CreerLivraisonDto {
     @ApiProperty({ enum: ZONES, example: 'Libreville', description: "Zone d'enlèvement du colis" })
     @IsIn(ZONES, { message: `Zone de départ invalide. ${MESSAGE_ZONE}` })
@@ -136,6 +181,14 @@ export class CreerLivraisonDto {
     @ValidateNested()
     @Type(() => ColisDto)
     colis: ColisDto;
+
+    @ApiProperty({ type: PaiementDto })
+    // `@ValidateNested` seul laisse passer un bloc ABSENT : la requête
+    // atteindrait le service et y lèverait une 500.
+    @IsDefined({ message: 'Veuillez indiquer qui paie la course (paiement.payeur)' })
+    @ValidateNested()
+    @Type(() => PaiementDto)
+    paiement: PaiementDto;
 
     @ApiPropertyOptional({
         example: '2026-10-23T09:00:00+01:00',

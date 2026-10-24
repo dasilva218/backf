@@ -5,7 +5,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  * Limiteur de débit qui compte par COMPTE plutôt que par IP.
  *
  * Toutes les requêtes du front arrivent depuis le serveur Next : par IP, toutes
- * les boutiques partageraient un seul seau, et un seul abuseur bloquerait tout
+ * les clients partageraient un seul seau, et un seul abuseur bloquerait tout
  * le monde. Doit donc s'exécuter APRÈS `JwtAuthGuard`, qui pose `req.user`.
  *
  * - requête authentifiée → l'id du compte ;

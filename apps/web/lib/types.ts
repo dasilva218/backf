@@ -6,11 +6,13 @@
 export const ZONES = ["Akanda", "Libreville", "Owendo"] as const;
 export type Zone = (typeof ZONES)[number];
 
-export const TYPES_COURSE = ["standard", "express", "volumineux"] as const;
-export type TypeCourse = (typeof TYPES_COURSE)[number];
+/** Tout ce qu'une course existante peut porter, retirés compris. */
+export type TypeCourse = "standard" | "express" | "volumineux";
+export type Vehicule = "moto" | "voiture" | "camionnette";
 
-export const VEHICULES = ["moto", "voiture", "camionnette"] as const;
-export type Vehicule = (typeof VEHICULES)[number];
+/** Ce qui est proposé à la création. `volumineux` et `camionnette` sont retirés pour l'instant. */
+export const TYPES_COURSE = ["standard", "express"] as const satisfies readonly TypeCourse[];
+export const VEHICULES = ["moto", "voiture"] as const satisfies readonly Vehicule[];
 
 /** Une ligne de `GET /tarifs`. Seul `tarif` (prix client) est affiché. */
 export interface Devis {
@@ -21,8 +23,14 @@ export interface Devis {
   devise: string;
 }
 
-export interface ProfilBoutique {
+export const TYPES_CLIENT = ["PARTICULIER", "ENTREPRISE", "BOUTIQUE"] as const;
+export type TypeClient = (typeof TYPES_CLIENT)[number];
+
+export interface ProfilClient {
   id: string;
+  type: TypeClient;
+  /** Nom de l'entreprise ou de la boutique ; null pour un particulier. */
+  raisonSociale: string | null;
   firstname: string;
   lastname: string;
   phoneAirtel: string | null;
@@ -30,21 +38,38 @@ export interface ProfilBoutique {
   address: string | null;
 }
 
+/** Valeurs envoyées à l'API (`paiement.payeur`). */
+export const PAYEURS = ["expediteur", "destinataire"] as const;
+export type PayeurDemande = (typeof PAYEURS)[number];
+
+/** Valeurs renvoyées par l'API (`Livraison.payeur`). */
+export type Payeur = "EXPEDITEUR" | "DESTINATAIRE";
+
+/** Miroir de `PLAFOND_MARCHANDISE` dans l'API, qui seule fait foi. */
+export const PLAFOND_MARCHANDISE = 50_000;
+
 export type StatutLivraison =
   | "EN_ATTENTE"
   | "ACCEPTEE"
   | "EN_COURS"
   | "LIVREE"
   | "ANNULEE"
-  | "EN_LITIGE";
+  | "EN_LITIGE"
+  | "RETOUR_EXPEDITEUR"
+  | "RETOURNEE";
+
+/** La flotte qui a pris la course ; null tant que personne ne l'a acceptée. */
+export type Flotte = "FIND_DELIVERY" | "EWUANG";
 
 export interface Livraison {
   id: string;
   referenceExterne: string | null;
   missionEwuangId: string | null;
+  /** Fait foi quand la flotte find_delivery a la course. */
   statut: StatutLivraison;
-  /** Statut d'Ewuang, repris tel quel : il fait foi. */
+  /** Statut d'Ewuang, repris tel quel : il fait foi pour une course de sa flotte, ou pas encore prise. */
   statutEwuang: string | null;
+  flotte: Flotte | null;
   erreurEwuang: string | null;
   codeRemise: string | null;
   typeCourse: TypeCourse | null;
@@ -55,6 +80,9 @@ export interface Livraison {
   destinataireNom: string | null;
   destinataireContact: string | null;
   tarif: number | null;
+  /** Null : course réglée hors course, créée avant le paiement en espèces. */
+  payeur: Payeur | null;
+  montantMarchandise: number;
   livreurNom: string | null;
   livreurContact: string | null;
   livreurTypeVehicule: string | null;
@@ -64,6 +92,8 @@ export interface Livraison {
   dateRecuperation: string | null;
   dateLivraison: string | null;
   dateAnnulation: string | null;
+  /** Colis rendu à l'expéditeur après un échec de remise. */
+  dateRetour: string | null;
 }
 
 /** Corps envoyé à Ewuang, servi par `GET /livraisons/:id`. */
@@ -82,6 +112,20 @@ export interface PageLivraisons {
   total: number;
   page: number;
   limite: number;
+}
+
+/** `GET /clients/moi/especes` : contre-remboursements encaissés pour le client (registre, phase 3). */
+export interface ReleveClient {
+  /** Ce que find_delivery doit au client et ne lui a pas encore reversé. */
+  du: number;
+  mouvements: {
+    id: string;
+    type: "MARCHANDISE" | "REVERSEMENT";
+    montant: number;
+    referenceCourse: string | null;
+    recu: string | null;
+    createdAt: string;
+  }[];
 }
 
 export interface ResultatTransmission {

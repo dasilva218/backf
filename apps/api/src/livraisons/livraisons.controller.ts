@@ -23,19 +23,19 @@ import { LivraisonsService } from './livraisons.service.js';
 type Utilisateur = Omit<User, 'password'>;
 
 @ApiTags('Livraisons')
-@Roles(UserRole.BOUTIQUE, UserRole.ADMIN)
+@Roles(UserRole.CLIENT, UserRole.ADMIN)
 @Controller('livraisons')
 export class LivraisonsController {
     constructor(private readonly livraisons: LivraisonsService) { }
 
     @Post()
-    @Roles(UserRole.BOUTIQUE)
+    @Roles(UserRole.CLIENT)
     // Chaque course dispatche un vrai livreur Ewuang : seau étroit, par compte.
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Soumet une course, dispatchée à la flotte Ewuang',
         description:
-            "Le prix vient de la grille find_delivery (zone d'arrivée + type). Le `codeRemise` renvoyé est à transmettre au destinataire : le livreur le lui réclamera à la remise.",
+            "Le prix vient de la grille find_delivery (zone d'arrivée + type). Il est payé en espèces au livreur, par l'expéditeur à l'enlèvement ou par le destinataire à la remise (`paiement.payeur`). Le `codeRemise` renvoyé est à transmettre au destinataire : le livreur le lui réclamera à la remise.",
     })
     @ApiResponse({ status: 201, description: 'Course créée et transmise à Ewuang.' })
     @ApiResponse({
@@ -44,7 +44,7 @@ export class LivraisonsController {
             'Course enregistrée mais Ewuang injoignable : `transmise` vaut false, à rejouer par POST /livraisons/:id/renvoyer.',
     })
     @ApiResponse({ status: 400, description: "Erreur de validation, ou course refusée par Ewuang (elle est alors annulée)." })
-    @ApiResponse({ status: 403, description: 'Profil boutique non renseigné.' })
+    @ApiResponse({ status: 403, description: 'Profil client non renseigné.' })
     async creer(
         @CurrentUser() user: Utilisateur,
         @Body() dto: CreerLivraisonDto,
@@ -56,7 +56,7 @@ export class LivraisonsController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Courses de la boutique connectée (toutes pour un ADMIN), les plus récentes en tête' })
+    @ApiOperation({ summary: 'Courses du client connecté (toutes pour un ADMIN), les plus récentes en tête' })
     @ApiResponse({ status: 200, description: 'Page de courses : `donnees`, `total`, `page`, `limite`.' })
     lister(@CurrentUser() user: Utilisateur, @Query() query: ListerLivraisonsDto) {
         return this.livraisons.lister(user, query);

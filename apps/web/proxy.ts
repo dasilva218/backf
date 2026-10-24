@@ -15,7 +15,7 @@ const PAGES_PUBLIQUES = ["/"];
 export default function proxy(requete: NextRequest) {
   const chemin = requete.nextUrl.pathname;
   const charge = lireChargeJeton(requete.cookies.get(NOM_COOKIE_SESSION)?.value);
-  const connecte = !!charge && !jetonExpire(charge) && charge.role === "BOUTIQUE";
+  const connecte = !!charge && !jetonExpire(charge) && charge.role === "CLIENT";
 
   // `/deconnexion` passe toujours : c'est elle qui efface un cookie périmé.
   if (chemin.startsWith("/deconnexion") || PAGES_PUBLIQUES.includes(chemin)) {

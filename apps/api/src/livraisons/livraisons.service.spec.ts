@@ -1,10 +1,11 @@
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     NotFoundException,
     ServiceUnavailableException,
 } from '@nestjs/common';
-import { StatutLivraison, UserRole } from '@prisma/client';
+import { Flotte, Payeur, StatutLivraison, UserRole } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EwuangClient, MissionCreee } from '../ewuang/ewuang.client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -17,22 +18,30 @@ import { LivraisonsService } from './livraisons.service.js';
  * l'accès à la base.
  */
 
-const BOUTIQUE = { id: 'u-boutique', role: UserRole.BOUTIQUE };
+const CLIENT = { id: 'u-client', role: UserRole.CLIENT };
 
 const PROFIL = {
-    id: 'b-1',
-    userBoutiqueId: 'u-boutique',
+    id: 'c-1',
+    userClientId: 'u-client',
     address: 'Quartier Louis',
     phoneAirtel: '+24107112233',
     phoneMoov: null,
 };
 
-const DTO: CreerLivraisonDto = {
+// Objet simple, pas typé comme la classe du DTO : il se décline par spread.
+const DEMANDE = {
     zone_depart: 'Libreville',
     zone_arrivee: 'Akanda',
     type_course: 'standard',
     destinataire: { nom: 'Awa Mbadinga', adresse: 'Angondjé', contact: '+24106998877' },
     colis: { description: '2 cartons' },
+} satisfies Omit<CreerLivraisonDto, 'paiement'>;
+
+const DTO: CreerLivraisonDto = { ...DEMANDE, paiement: { payeur: 'expediteur' } };
+
+const AVEC_MARCHANDISE: CreerLivraisonDto = {
+    ...DEMANDE,
+    paiement: { payeur: 'destinataire', montant_marchandise: 15_000 },
 };
 
 const MISSION: MissionCreee = {
@@ -50,7 +59,7 @@ const MISSION: MissionCreee = {
 
 function fabriquer() {
     const prisma = {
-        boutique: { findUnique: vi.fn().mockResolvedValue(PROFIL) },
+        client: { findUnique: vi.fn().mockResolvedValue(PROFIL) },
         livraison: {
             create: vi.fn().mockResolvedValue({ id: 'l-1' }),
             update: vi.fn().mockResolvedValue({}),
@@ -79,22 +88,48 @@ describe('LivraisonsService.creer', () => {
         f = fabriquer();
     });
 
-    it('refuse une boutique sans profil, sans rien écrire', async () => {
-        f.prisma.boutique.findUnique.mockResolvedValue(null);
-        await expect(f.service.creer(BOUTIQUE, DTO)).rejects.toBeInstanceOf(ForbiddenException);
+    it('refuse un client sans profil, sans rien écrire', async () => {
+        f.prisma.client.findUnique.mockResolvedValue(null);
+        await expect(f.service.creer(CLIENT, DTO)).rejects.toBeInstanceOf(ForbiddenException);
         expect(f.prisma.livraison.create).not.toHaveBeenCalled();
     });
 
     it("envoie la zone d'arrivée et les valeurs du profil pour l'enlèvement", async () => {
-        await f.service.creer(BOUTIQUE, DTO);
+        await f.service.creer(CLIENT, DTO);
         const charge = f.ewuang.creerMission.mock.calls[0][0];
         expect(charge.zone).toBe('Akanda');
         expect(charge.enlevement).toEqual({ adresse: 'Quartier Louis', contact: '+24107112233' });
         expect(charge.reference_externe).toMatch(/^FD-/);
     });
 
+    it('enregistre le payeur choisi et, sans marchandise, un montant nul', async () => {
+        await f.service.creer(CLIENT, DTO);
+        expect(f.prisma.livraison.create.mock.calls[0][0].data).toMatchObject({
+            payeur: Payeur.EXPEDITEUR,
+            montantMarchandise: 0,
+        });
+    });
+
+    it('enregistre le contre-remboursement payé par le destinataire', async () => {
+        await f.service.creer(CLIENT, AVEC_MARCHANDISE);
+        expect(f.prisma.livraison.create.mock.calls[0][0].data).toMatchObject({
+            payeur: Payeur.DESTINATAIRE,
+            montantMarchandise: 15_000,
+        });
+    });
+
+    it('envoie le bloc paiement de la v2 : frais = NOTRE prix client, pas le tarif Ewuang', async () => {
+        await f.service.creer(CLIENT, AVEC_MARCHANDISE);
+        expect(f.ewuang.creerMission.mock.calls[0][0].paiement).toEqual({
+            mode: 'especes',
+            payeur: 'destinataire',
+            frais: 1_500,
+            montant_marchandise: 15_000,
+        });
+    });
+
     it("enregistre la course AVANT d'appeler Ewuang, avec le corps envoyé", async () => {
-        await f.service.creer(BOUTIQUE, DTO);
+        await f.service.creer(CLIENT, DTO);
         const ordreCreation = f.prisma.livraison.create.mock.invocationCallOrder[0];
         const ordreAppel = f.ewuang.creerMission.mock.invocationCallOrder[0];
         expect(ordreCreation).toBeLessThan(ordreAppel);
@@ -106,7 +141,7 @@ describe('LivraisonsService.creer', () => {
     });
 
     it("succès : la commission devient le prix client moins la part d'Ewuang (remuneration_livreur, pas tarif)", async () => {
-        const resultat = await f.service.creer(BOUTIQUE, DTO);
+        const resultat = await f.service.creer(CLIENT, DTO);
         expect(resultat.transmise).toBe(true);
         expect(f.prisma.livraison.update.mock.calls[0][0].data).toMatchObject({
             missionEwuangId: 'm-1',
@@ -124,16 +159,16 @@ describe('LivraisonsService.creer', () => {
 
     it('Ewuang injoignable : la course reste, non transmise, avec le motif', async () => {
         f.ewuang.creerMission.mockRejectedValue(new ServiceUnavailableException('injoignable'));
-        const resultat = await f.service.creer(BOUTIQUE, DTO);
+        const resultat = await f.service.creer(CLIENT, DTO);
         expect(resultat.transmise).toBe(false);
         expect(f.prisma.livraison.update.mock.calls[0][0].data).toEqual({
             erreurEwuang: 'injoignable',
         });
     });
 
-    it('refus définitif : la course est annulée et la boutique reçoit un 400', async () => {
+    it('refus définitif : la course est annulée et le client reçoit un 400', async () => {
         f.ewuang.creerMission.mockRejectedValue(new BadRequestException('Zone inconnue'));
-        await expect(f.service.creer(BOUTIQUE, DTO)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(f.service.creer(CLIENT, DTO)).rejects.toBeInstanceOf(BadRequestException);
         expect(f.prisma.livraison.update.mock.calls[0][0].data).toMatchObject({
             statut: StatutLivraison.ANNULEE,
             erreurEwuang: 'Zone inconnue',
@@ -147,9 +182,9 @@ describe('LivraisonsService.annuler', () => {
         f = fabriquer();
     });
 
-    it("course d'une autre boutique : 404", async () => {
+    it("course d'un autre client : 404", async () => {
         f.prisma.livraison.findFirst.mockResolvedValue(null);
-        await expect(f.service.annuler(BOUTIQUE, 'l-x')).rejects.toBeInstanceOf(NotFoundException);
+        await expect(f.service.annuler(CLIENT, 'l-x')).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('course transmise : annulée chez Ewuang puis en local', async () => {
@@ -161,12 +196,60 @@ describe('LivraisonsService.annuler', () => {
             missionEwuangId: 'm-1',
             chargeEwuang: {},
         });
-        await f.service.annuler(BOUTIQUE, 'l-1');
+        await f.service.annuler(CLIENT, 'l-1');
         expect(f.ewuang.annulerMission).toHaveBeenCalledWith('m-1');
-        expect(f.prisma.livraison.update.mock.calls[0][0].data).toMatchObject({
-            statut: StatutLivraison.ANNULEE,
-            statutEwuang: 'Annulée',
+        expect(f.prisma.livraison.updateMany.mock.calls[0][0]).toMatchObject({
+            // Conditionnée : un livreur find_delivery a pu accepter entre-temps.
+            where: { id: 'l-1', statut: { in: [StatutLivraison.EN_ATTENTE, StatutLivraison.ACCEPTEE] } },
+            data: { statut: StatutLivraison.ANNULEE, statutEwuang: 'Annulée' },
         });
+    });
+
+    it("mission déjà retirée chez Ewuang (course rendue par un livreur find_delivery) : pas de rappel à Ewuang", async () => {
+        f.prisma.livraison.findFirst.mockResolvedValue({
+            id: 'l-1',
+            tarif: 2_000,
+            statut: StatutLivraison.EN_ATTENTE,
+            statutEwuang: 'Annulée',
+            missionEwuangId: 'm-1',
+            chargeEwuang: {},
+            flotte: null,
+        });
+        await f.service.annuler(CLIENT, 'l-1');
+        expect(f.ewuang.annulerMission).not.toHaveBeenCalled();
+        expect(f.prisma.livraison.updateMany.mock.calls[0][0].data).toMatchObject({ statut: StatutLivraison.ANNULEE });
+    });
+
+    it('flotte find_delivery : annulable tant que le colis n’est pas récupéré, sans appel à Ewuang', async () => {
+        f.prisma.livraison.findFirst.mockResolvedValue({
+            id: 'l-1',
+            tarif: 2_000,
+            statut: StatutLivraison.ACCEPTEE,
+            statutEwuang: 'Annulée',
+            missionEwuangId: 'm-1',
+            chargeEwuang: {},
+            flotte: Flotte.FIND_DELIVERY,
+        });
+        await f.service.annuler(CLIENT, 'l-1');
+        expect(f.ewuang.annulerMission).not.toHaveBeenCalled();
+        expect(f.prisma.livraison.updateMany.mock.calls[0][0].where).toMatchObject({
+            flotte: Flotte.FIND_DELIVERY,
+            statut: StatutLivraison.ACCEPTEE,
+        });
+    });
+
+    it('flotte find_delivery, colis déjà récupéré : 409, retour par le support', async () => {
+        f.prisma.livraison.findFirst.mockResolvedValue({
+            id: 'l-1',
+            tarif: 2_000,
+            statut: StatutLivraison.EN_COURS,
+            statutEwuang: 'Annulée',
+            missionEwuangId: 'm-1',
+            chargeEwuang: {},
+            flotte: Flotte.FIND_DELIVERY,
+        });
+        f.prisma.livraison.updateMany.mockResolvedValue({ count: 0 });
+        await expect(f.service.annuler(CLIENT, 'l-1')).rejects.toBeInstanceOf(ConflictException);
     });
 
     it("course non transmise : récupère d'abord la mission peut-être créée chez Ewuang", async () => {
@@ -179,7 +262,7 @@ describe('LivraisonsService.annuler', () => {
             chargeEwuang: { reference_externe: 'FD-x' },
         });
         f.prisma.livraison.findUniqueOrThrow.mockResolvedValue({ missionEwuangId: 'm-1' });
-        await f.service.annuler(BOUTIQUE, 'l-1');
+        await f.service.annuler(CLIENT, 'l-1');
         expect(f.ewuang.creerMission).toHaveBeenCalledWith({ reference_externe: 'FD-x' });
         expect(f.ewuang.annulerMission).toHaveBeenCalledWith('m-1');
     });
@@ -194,7 +277,7 @@ describe('LivraisonsService.annuler', () => {
             chargeEwuang: { reference_externe: 'FD-x' },
         });
         f.ewuang.creerMission.mockRejectedValue(new ServiceUnavailableException('injoignable'));
-        await expect(f.service.annuler(BOUTIQUE, 'l-1')).rejects.toBeInstanceOf(
+        await expect(f.service.annuler(CLIENT, 'l-1')).rejects.toBeInstanceOf(
             ServiceUnavailableException,
         );
         expect(f.ewuang.annulerMission).not.toHaveBeenCalled();

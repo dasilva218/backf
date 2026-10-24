@@ -16,7 +16,7 @@ const SECTIONS = [
 
 /**
  * Menu de la page d'accueil. Les boutons d'action suivent la session : un
- * visiteur voit « Connexion / Créer un compte », une boutique connectée va
+ * visiteur voit « Connexion / Créer un compte », un client connecté va
  * droit à ses courses.
  */
 export function MenuAccueil({ connecte }: { connecte: boolean }) {

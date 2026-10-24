@@ -4,14 +4,14 @@ import { UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { appelerApi } from "@/lib/api";
-import type { Devis, ProfilBoutique } from "@/lib/types";
+import type { Devis, ProfilClient } from "@/lib/types";
 import { FormulaireCourse } from "./formulaire";
 
 export const metadata: Metadata = { title: "Nouvelle course" };
 
 export default async function PageNouvelleCourse() {
   const [profil, grille] = await Promise.all([
-    appelerApi<ProfilBoutique>("/boutiques/moi"),
+    appelerApi<ProfilClient>("/clients/moi"),
     appelerApi<Devis[]>("/tarifs"),
   ]);
 
@@ -32,8 +32,8 @@ export default async function PageNouvelleCourse() {
               Complétez d&apos;abord votre profil
             </CardTitle>
             <CardDescription>
-              Votre nom, votre téléphone et l&apos;adresse de la boutique servent de point
-              d&apos;enlèvement par défaut.
+              Votre nom, votre téléphone et votre adresse servent de point d&apos;enlèvement par
+              défaut.
             </CardDescription>
           </CardHeader>
           <CardContent>

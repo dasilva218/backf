@@ -13,7 +13,7 @@ type Succes = Extract<NonNullable<EtatAction>, { ok: true }>;
  * Soumission par `onSubmit` + `startTransition`, et non par `<form action>` :
  * React 19 VIDE les champs d'un `<form action>` à la fin de chaque action,
  * erreur comprise. Une faute de saisie sur le formulaire de course effacerait
- * alors tout ce que la boutique a tapé.
+ * alors tout ce que le client a tapé.
  */
 export function useFormulaireAction(
   actionServeur: (etat: EtatAction, formData: FormData) => Promise<EtatAction>,

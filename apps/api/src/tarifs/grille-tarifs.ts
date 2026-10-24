@@ -43,10 +43,14 @@ import type { TypeCourse } from '../ewuang/ewuang.client.js';
 export const ZONES = ['Akanda', 'Libreville', 'Owendo'] as const;
 export type Zone = (typeof ZONES)[number];
 
+/**
+ * Types proposés au client. `volumineux` est retiré pour l'instant (décision
+ * de Franck, 2026-10-24) : il reste dans `TypeCourse` et `SUPPLEMENT` pour les
+ * courses déjà créées, mais n'est plus ni devisé ni accepté à la création.
+ */
 export const TYPES_COURSE = [
     'standard',
     'express',
-    'volumineux',
 ] as const satisfies readonly TypeCourse[];
 
 /** Commission reversée par Ewuang à find_delivery, en pourcentage du prix. */

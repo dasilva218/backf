@@ -10,7 +10,7 @@ import {
 } from "@/lib/jeton";
 
 /**
- * Session de la boutique : le JWT de l'API, dans un cookie httpOnly.
+ * Session du client : le JWT de l'API, dans un cookie httpOnly.
  *
  * Le jeton n'est jamais exposé au JavaScript du navigateur — un script injecté
  * ne peut pas le lire. Tous les appels à l'API partent donc du serveur Next
@@ -37,18 +37,18 @@ export async function fermerSession(): Promise<void> {
 }
 
 /**
- * Session de boutique valide, ou `null` — sans rediriger. Pour les pages
+ * Session de client valide, ou `null` — sans rediriger. Pour les pages
  * publiques qui adaptent seulement leur menu : lecture optimiste, aucune
  * donnée n'en dépend.
  */
 export async function lireSessionOptimiste(): Promise<{ email: string } | null> {
   const charge = lireChargeJeton((await cookies()).get(NOM_COOKIE_SESSION)?.value);
-  if (!charge || jetonExpire(charge) || charge.role !== "BOUTIQUE") return null;
+  if (!charge || jetonExpire(charge) || charge.role !== "CLIENT") return null;
   return { email: charge.email };
 }
 
 /**
- * Exige une session de boutique valide, sinon redirige.
+ * Exige une session de client valide, sinon redirige.
  *
  * Mémoïsée par rendu (`cache`) : le layout et la page l'appellent tous deux
  * sans relire le cookie. Un jeton expiré ou d'un autre rôle passe par
@@ -61,7 +61,9 @@ export const exigerSession = cache(async () => {
 
   if (!jeton || !charge) redirect("/connexion");
   if (jetonExpire(charge)) redirect("/deconnexion?motif=expiree");
-  if (charge.role !== "BOUTIQUE") redirect("/deconnexion?motif=role");
+  // Un jeton émis avant le 2026-10-23 porte encore le rôle BOUTIQUE : il passe
+  // par ici une fois, puis la reconnexion en délivre un nouveau.
+  if (charge.role !== "CLIENT") redirect("/deconnexion?motif=role");
 
   return { jeton, email: charge.email };
 });

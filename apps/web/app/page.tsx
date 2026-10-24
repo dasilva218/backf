@@ -20,7 +20,7 @@ import { ZONES, type Devis, type TypeCourse, type Zone } from "@/lib/types";
 
 /**
  * Page d'accueil publique : présentation, grille de prix et accès à l'espace
- * boutique. Les prix viennent de `GET /tarifs` (public) et ne sont jamais
+ * client. Les prix viennent de `GET /tarifs` (public) et ne sont jamais
  * recopiés ici, pour qu'un changement de grille côté API s'y reflète seul.
  */
 
@@ -107,13 +107,14 @@ export default async function Accueil() {
                 Un livreur pour vos colis, en quelques clics.
               </h1>
               <p className="max-w-xl text-lg text-muted-foreground text-pretty">
-                Soumettez votre course, un livreur vient la récupérer à votre boutique et la remet à
-                votre client contre un code. Le prix est connu d&apos;avance.
+                Soumettez votre course, un livreur vient récupérer le colis chez vous et le remet à
+                votre destinataire contre un code. Le prix est connu d&apos;avance, et se paie en espèces
+                au livreur.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild size="lg">
                   <Link href={connecte ? "/courses/nouvelle" : "/inscription"}>
-                    {connecte ? "Nouvelle course" : "Créer un compte boutique"}
+                    {connecte ? "Nouvelle course" : "Créer un compte"}
                     <ArrowRight aria-hidden />
                   </Link>
                 </Button>
@@ -239,8 +240,8 @@ export default async function Accueil() {
               <li className="flex gap-3">
                 <Bike className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">Le bon véhicule.</span> Moto, voiture ou
-                  camionnette : exigez-le pour un colis encombrant.
+                  <span className="font-medium text-foreground">Le bon véhicule.</span> Moto ou voiture :
+                  exigez-le si votre colis le demande.
                 </p>
               </li>
             </ul>
@@ -274,11 +275,11 @@ export default async function Accueil() {
             <p className="max-w-xl text-muted-foreground">
               {connecte
                 ? "Créez la course, nous la proposons aux livreurs."
-                : "Créez votre compte boutique en une minute, puis soumettez votre première course."}
+                : "Particulier, entreprise ou boutique : créez votre compte en une minute, puis soumettez votre première course."}
             </p>
             <Button asChild size="lg">
               <Link href={connecte ? "/courses/nouvelle" : "/inscription"}>
-                {connecte ? "Nouvelle course" : "Créer un compte boutique"}
+                {connecte ? "Nouvelle course" : "Créer un compte"}
                 <ArrowRight aria-hidden />
               </Link>
             </Button>

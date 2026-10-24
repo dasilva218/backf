@@ -81,7 +81,7 @@ export function appelerApiPublique<T>(chemin: string, methode = "GET", corps?: u
 }
 
 /**
- * Appel au nom de la boutique connectée.
+ * Appel au nom du client connecté.
  *
  * Un 401 malgré un jeton non expiré (secret changé côté API, compte
  * désactivé) mène à `/deconnexion` : rien de ce qu'affiche la page ne serait

@@ -13,7 +13,7 @@ export const NOM_COOKIE_SESSION = "fd_session";
 export interface ChargeJeton {
   sub: string;
   email: string;
-  role: "BOUTIQUE" | "LIVREUR" | "ADMIN";
+  role: "CLIENT" | "LIVREUR" | "ADMIN";
   /** Expiration, en secondes depuis l'époque Unix. */
   exp: number;
 }

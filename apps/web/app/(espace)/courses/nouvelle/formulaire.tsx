@@ -10,19 +10,35 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DESCRIPTIONS_TYPE, formaterMontant, LIBELLES_TYPE } from "@/lib/affichage";
+import { calculerEncaissements, DESCRIPTIONS_TYPE, formaterMontant, LIBELLES_TYPE } from "@/lib/affichage";
 import {
+  PAYEURS,
+  PLAFOND_MARCHANDISE,
   TYPES_COURSE,
   VEHICULES,
   ZONES,
   type Devis,
-  type ProfilBoutique,
+  type PayeurDemande,
+  type ProfilClient,
   type TypeCourse,
   type Zone,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LIBELLES_VEHICULE = { moto: "Moto", voiture: "Voiture", camionnette: "Camionnette" } as const;
+
+const LIBELLES_PAYEUR: Record<PayeurDemande, { titre: string; detail: string }> = {
+  expediteur: { titre: "L'expéditeur", detail: "En espèces, au livreur, à l'enlèvement du colis" },
+  destinataire: { titre: "Le destinataire", detail: "En espèces, au livreur, à la remise du colis" },
+};
+
+/** Saisie libre du montant ; null quand elle n'est pas un entier valide. */
+function lireMontant(saisie: string): number | null {
+  const nettoyee = saisie.replace(/\s/g, "");
+  if (nettoyee === "") return 0;
+  const montant = Number(nettoyee);
+  return Number.isInteger(montant) && montant >= 0 ? montant : null;
+}
 
 function Champ({
   id,
@@ -48,11 +64,14 @@ function Champ({
   );
 }
 
-export function FormulaireCourse({ grille, profil }: { grille: Devis[]; profil: ProfilBoutique }) {
+export function FormulaireCourse({ grille, profil }: { grille: Devis[]; profil: ProfilClient }) {
   const router = useRouter();
   const [zoneDepart, setZoneDepart] = useState<Zone>("Libreville");
   const [zoneArrivee, setZoneArrivee] = useState<Zone>("Libreville");
   const [typeCourse, setTypeCourse] = useState<TypeCourse>("standard");
+  // Pas de payeur par défaut : le choix revient au client (décision D3).
+  const [payeur, setPayeur] = useState<PayeurDemande | null>(null);
+  const [saisieMarchandise, setSaisieMarchandise] = useState("");
 
   const { soumettre, enCours } = useFormulaireAction(creerCourse, (etat) => {
     if (etat.id) router.push(`/courses/${etat.id}`);
@@ -62,6 +81,14 @@ export function FormulaireCourse({ grille, profil }: { grille: Devis[]; profil: 
     grille.find((d) => d.zoneDepart === zoneDepart && d.zoneArrivee === zoneArrivee && d.typeCourse === type)?.tarif;
 
   const telephoneProfil = profil.phoneAirtel || profil.phoneMoov;
+
+  const tarif = prix(typeCourse);
+  const montantMarchandise = lireMontant(saisieMarchandise);
+  const marchandiseInvalide = montantMarchandise === null || montantMarchandise > PLAFOND_MARCHANDISE;
+  const encaissements =
+    tarif !== undefined && payeur && !marchandiseInvalide
+      ? calculerEncaissements(tarif, payeur === "expediteur" ? "EXPEDITEUR" : "DESTINATAIRE", montantMarchandise)
+      : null;
 
   return (
     <form onSubmit={soumettre} className="grid gap-6 lg:grid-cols-[1fr_18rem] lg:items-start">
@@ -244,6 +271,63 @@ export function FormulaireCourse({ grille, profil }: { grille: Devis[]; profil: 
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Paiement</CardTitle>
+            <CardDescription>La course se paie en espèces, au livreur.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm font-medium">Qui paie la course ?</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {PAYEURS.map((p) => (
+                  <label
+                    key={p}
+                    className={cn(
+                      "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors hover:bg-accent/50 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+                      payeur === p && "border-primary bg-primary/5",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="payeur"
+                      value={p}
+                      checked={payeur === p}
+                      onChange={() => setPayeur(p)}
+                      required
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-medium">{LIBELLES_PAYEUR[p].titre}</span>
+                    <span className="text-xs text-muted-foreground">{LIBELLES_PAYEUR[p].detail}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <Champ
+              id="montant_marchandise"
+              libelle="Prix de la marchandise à encaisser (facultatif)"
+              aide={`Le livreur l'encaisse auprès du destinataire, à la remise, et nous vous le reversons. ${formaterMontant(PLAFOND_MARCHANDISE)} au plus. Laissez vide si le destinataire n'a rien à payer pour la marchandise.`}
+            >
+              <Input
+                id="montant_marchandise"
+                name="montant_marchandise"
+                inputMode="numeric"
+                value={saisieMarchandise}
+                onChange={(e) => setSaisieMarchandise(e.target.value)}
+                placeholder="0"
+                aria-describedby="montant_marchandise-aide"
+                aria-invalid={marchandiseInvalide}
+              />
+            </Champ>
+            {marchandiseInvalide && (
+              <p role="alert" className="-mt-3 text-xs text-destructive">
+                Saisissez un nombre entier de FCFA, {formaterMontant(PLAFOND_MARCHANDISE)} au plus.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <aside className="lg:sticky lg:top-24">
@@ -265,12 +349,28 @@ export function FormulaireCourse({ grille, profil }: { grille: Devis[]; profil: 
               </div>
             </dl>
             <div className="flex items-baseline justify-between border-t pt-4">
-              <span className="text-sm text-muted-foreground">À payer</span>
+              <span className="text-sm text-muted-foreground">Prix de la course</span>
               <span className="text-2xl font-semibold tabular-nums" aria-live="polite">
-                {formaterMontant(prix(typeCourse))}
+                {formaterMontant(tarif)}
               </span>
             </div>
-            <Button type="submit" size="lg" disabled={enCours}>
+            <dl className="flex flex-col gap-2 text-sm" aria-live="polite">
+              {encaissements ? (
+                <>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">Encaissé à l&apos;enlèvement</dt>
+                    <dd className="font-medium tabular-nums">{formaterMontant(encaissements.enlevement)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">Encaissé à la remise</dt>
+                    <dd className="font-medium tabular-nums">{formaterMontant(encaissements.remise)}</dd>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground">Indiquez qui paie pour voir ce que le livreur encaissera.</p>
+              )}
+            </dl>
+            <Button type="submit" size="lg" disabled={enCours || marchandiseInvalide}>
               Envoyer la course
             </Button>
           </CardContent>

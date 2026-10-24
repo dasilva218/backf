@@ -8,7 +8,7 @@ import {
     NotFoundException,
     ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma, StatutLivraison, UserRole, type User } from '@prisma/client';
+import { Flotte, Payeur, Prisma, StatutLivraison, UserRole, type User } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
     EwuangClient,
@@ -17,11 +17,11 @@ import {
 } from '../ewuang/ewuang.client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { calculerDevis } from '../tarifs/grille-tarifs.js';
-import { CreerLivraisonDto } from './creer-livraison.dto.js';
+import { CreerLivraisonDto, type PayeurDemande } from './creer-livraison.dto.js';
 import { ListerLivraisonsDto } from './lister-livraisons.dto.js';
 
 /**
- * Courses soumises par les boutiques et dispatchées à Ewuang.
+ * Courses soumises par les clients et dispatchées à Ewuang.
  *
  * ── Enregistrer d'abord, transmettre ensuite ───────────────────────────────
  *
@@ -32,13 +32,25 @@ import { ListerLivraisonsDto } from './lister-livraisons.dto.js';
  * idempotent sur `reference_externe`, donc le rejeu ne crée pas de doublon.
  * L'ordre inverse perdrait la trace d'une mission peut-être créée chez lui.
  *
- * ── Ce que la boutique ne voit pas ─────────────────────────────────────────
+ * ── Ce que le client ne voit pas ───────────────────────────────────────────
  *
  * `commission`, `tarifEwuang` et `remunerationLivreur` sont la marge de
  * find_delivery et ce qu'elle paie à Ewuang : réservés à l'ADMIN.
+ *
+ * ── Le paiement transmis à Ewuang ──────────────────────────────────────────
+ *
+ * `chargeEwuang` porte le bloc `paiement` de la v2 du contrat (payeur, frais =
+ * notre prix client, marchandise). Un Ewuang encore en v1 l'ignore : ses
+ * livreurs n'encaissent alors rien. La v2 doit être en service des deux côtés
+ * avant le lancement (phase 4 du plan).
  */
 
 type Utilisateur = Pick<User, 'id' | 'role'>;
+
+const PAYEUR: Record<PayeurDemande, Payeur> = {
+    expediteur: Payeur.EXPEDITEUR,
+    destinataire: Payeur.DESTINATAIRE,
+};
 
 /** Issue d'une tentative de transmission à Ewuang. */
 type Transmission =
@@ -48,7 +60,7 @@ type Transmission =
     /** Refus définitif de la requête : la course est passée ANNULEE. */
     | { issue: 'refusee'; message: string };
 
-const CHAMPS_BOUTIQUE = {
+const CHAMPS_CLIENT = {
     id: true,
     referenceExterne: true,
     missionEwuangId: true,
@@ -64,6 +76,9 @@ const CHAMPS_BOUTIQUE = {
     destinataireNom: true,
     destinataireContact: true,
     tarif: true,
+    payeur: true,
+    montantMarchandise: true,
+    flotte: true,
     livreurNom: true,
     livreurContact: true,
     livreurTypeVehicule: true,
@@ -73,11 +88,12 @@ const CHAMPS_BOUTIQUE = {
     dateRecuperation: true,
     dateLivraison: true,
     dateAnnulation: true,
+    dateRetour: true,
 } satisfies Prisma.LivraisonSelect;
 
 const CHAMPS_ADMIN = {
-    ...CHAMPS_BOUTIQUE,
-    boutiqueId: true,
+    ...CHAMPS_CLIENT,
+    clientId: true,
     commission: true,
     tarifEwuang: true,
     remunerationLivreur: true,
@@ -99,28 +115,28 @@ export class LivraisonsService {
      * être joint — le contrôleur répond alors 202.
      */
     async creer(user: Utilisateur, dto: CreerLivraisonDto) {
-        const boutique = await this.prisma.boutique.findUnique({
-            where: { userBoutiqueId: user.id },
+        const client = await this.prisma.client.findUnique({
+            where: { userClientId: user.id },
         });
-        if (!boutique) {
+        if (!client) {
             throw new ForbiddenException(
-                'Renseignez votre profil boutique (PUT /boutiques/moi) avant de soumettre une course',
+                'Renseignez votre profil client (PUT /clients/moi) avant de soumettre une course',
             );
         }
 
         // `||` et non `??` : un champ de profil vide ("") n'est pas une
         // adresse.
-        const adresseEnlevement = dto.enlevement?.adresse || boutique.address;
+        const adresseEnlevement = dto.enlevement?.adresse || client.address;
         const contactEnlevement =
-            dto.enlevement?.contact || boutique.phoneAirtel || boutique.phoneMoov;
+            dto.enlevement?.contact || client.phoneAirtel || client.phoneMoov;
         if (!adresseEnlevement) {
             throw new BadRequestException(
-                "Indiquez l'adresse d'enlèvement : votre profil boutique n'en a pas",
+                "Indiquez l'adresse d'enlèvement : votre profil client n'en a pas",
             );
         }
         if (!contactEnlevement) {
             throw new BadRequestException(
-                "Indiquez le contact d'enlèvement : votre profil boutique n'a pas de téléphone",
+                "Indiquez le contact d'enlèvement : votre profil client n'a pas de téléphone",
             );
         }
 
@@ -154,11 +170,19 @@ export class LivraisonsService {
                     : {}),
             },
             ...(dto.date_souhaitee ? { date_souhaitee: dto.date_souhaitee } : {}),
+            paiement: {
+                mode: 'especes',
+                payeur: dto.paiement.payeur,
+                // Notre prix client, pas le tarif d'Ewuang : c'est ce que le
+                // livreur Ewuang encaisse, et la différence nous revient.
+                frais: devis.tarif,
+                montant_marchandise: dto.paiement.montant_marchandise ?? 0,
+            },
         };
 
         const livraison = await this.prisma.livraison.create({
             data: {
-                boutiqueId: boutique.id,
+                clientId: client.id,
                 referenceExterne,
                 typeCourse: dto.type_course,
                 zoneDepart: dto.zone_depart,
@@ -171,6 +195,8 @@ export class LivraisonsService {
                 // Provisoire : la commission réelle se lit sur la part renvoyée
                 // par Ewuang, et remplace celle-ci à la transmission.
                 commission: devis.commission,
+                payeur: PAYEUR[dto.paiement.payeur],
+                montantMarchandise: dto.paiement.montant_marchandise ?? 0,
                 chargeEwuang: charge as unknown as Prisma.InputJsonValue,
             },
             select: { id: true },
@@ -209,14 +235,31 @@ export class LivraisonsService {
      *
      * Ewuang refuse (409, relayé en 400) une fois le colis récupéré : le
      * livreur en répond, l'annulation passe alors par le support.
+     *
+     * Une course prise par la flotte find_delivery ne s'annule qu'avant
+     * l'enlèvement ; après, c'est un retour à l'expéditeur (règle R4).
      */
     async annuler(user: Utilisateur, id: string) {
         const livraison = await this.trouverPourEcriture(user, id);
 
-        if (
-            livraison.statut === StatutLivraison.ANNULEE ||
-            livraison.statutEwuang === 'Annulée'
-        ) {
+        if (livraison.statut === StatutLivraison.ANNULEE) {
+            throw new ConflictException('Cette course est déjà annulée');
+        }
+
+        if (livraison.flotte === Flotte.FIND_DELIVERY) {
+            const { count } = await this.prisma.livraison.updateMany({
+                where: { id: livraison.id, flotte: Flotte.FIND_DELIVERY, statut: StatutLivraison.ACCEPTEE },
+                data: { statut: StatutLivraison.ANNULEE, dateAnnulation: new Date() },
+            });
+            if (count === 0) {
+                throw new ConflictException(
+                    "Le livreur a déjà récupéré le colis : il ne peut plus être annulé. Contactez find_delivery pour qu'il soit rapporté à l'expéditeur.",
+                );
+            }
+            return this.lire(user, livraison.id);
+        }
+
+        if (livraison.flotte === Flotte.EWUANG && livraison.statutEwuang === 'Annulée') {
             throw new ConflictException('Cette course est déjà annulée');
         }
         if (livraison.statutEwuang === 'Livrée') {
@@ -253,19 +296,33 @@ export class LivraisonsService {
         }
 
         let statutEwuang: string | undefined;
-        if (missionEwuangId) {
+        // Une mission déjà « Annulée » chez Ewuang (retirée quand un livreur
+        // find_delivery l'a prise puis rendue, ou annulée par Ewuang) n'a plus
+        // rien à annuler là-bas : la course ne vit plus que chez nous.
+        if (missionEwuangId && livraison.statutEwuang !== 'Annulée') {
             const reponse = await this.ewuang.annulerMission(missionEwuangId);
             statutEwuang = typeof reponse.statut === 'string' ? reponse.statut : 'Annulée';
         }
 
-        await this.prisma.livraison.update({
-            where: { id: livraison.id },
+        // Conditionnée par le statut : un livreur find_delivery a pu accepter
+        // pendant l'appel à Ewuang. Tant qu'il n'a pas le colis (ACCEPTEE),
+        // l'annulation tient (R4) ; s'il l'a déjà, elle ne touche rien.
+        const { count } = await this.prisma.livraison.updateMany({
+            where: {
+                id: livraison.id,
+                statut: { in: [StatutLivraison.EN_ATTENTE, StatutLivraison.ACCEPTEE] },
+            },
             data: {
                 statut: StatutLivraison.ANNULEE,
                 dateAnnulation: new Date(),
                 ...(statutEwuang ? { statutEwuang } : {}),
             },
         });
+        if (count === 0) {
+            throw new ConflictException(
+                "Le livreur a déjà récupéré le colis : il ne peut plus être annulé. Contactez find_delivery pour qu'il soit rapporté à l'expéditeur.",
+            );
+        }
 
         return this.lire(user, livraison.id);
     }
@@ -291,7 +348,7 @@ export class LivraisonsService {
             where: { ...this.portee(user), id },
             select: { ...this.champs(user), chargeEwuang: true },
         });
-        // 404 et non 403 pour la course d'une autre boutique : l'existence
+        // 404 et non 403 pour la course d'un autre client : l'existence
         // d'un identifiant ne doit pas fuiter.
         if (!livraison) {
             throw new NotFoundException('Course introuvable');
@@ -391,6 +448,7 @@ export class LivraisonsService {
                 statutEwuang: true,
                 missionEwuangId: true,
                 chargeEwuang: true,
+                flotte: true,
             },
         });
         if (!livraison) {
@@ -399,14 +457,14 @@ export class LivraisonsService {
         return livraison;
     }
 
-    /** Une boutique ne voit que ses courses ; l'ADMIN les voit toutes. */
+    /** Un client ne voit que ses courses ; l'ADMIN les voit toutes. */
     private portee(user: Utilisateur): Prisma.LivraisonWhereInput {
         return user.role === UserRole.ADMIN
             ? {}
-            : { boutique: { userBoutiqueId: user.id } };
+            : { client: { userClientId: user.id } };
     }
 
     private champs(user: Utilisateur) {
-        return user.role === UserRole.ADMIN ? CHAMPS_ADMIN : CHAMPS_BOUTIQUE;
+        return user.role === UserRole.ADMIN ? CHAMPS_ADMIN : CHAMPS_CLIENT;
     }
 }

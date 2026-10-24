@@ -9,9 +9,10 @@ export default function PageInscription() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Créer un compte boutique</CardTitle>
+        <CardTitle className="text-xl">Créer un compte</CardTitle>
         <CardDescription>
-          Confiez vos livraisons à des livreurs à Libreville, Akanda et Owendo.
+          Particulier, entreprise ou boutique : confiez vos livraisons à des livreurs à Libreville,
+          Akanda et Owendo.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
