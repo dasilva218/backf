@@ -29,7 +29,7 @@ l'accepte la prend.
 | D1 | Une boutique est un **client** comme un autre : particulier, entreprise ou boutique. | 2026-10-23 |
 | D2 | Au lancement, **paiement en espèces uniquement**, encaissé par le livreur. | 2026-10-23 |
 | D3 | **Le client choisit le payeur à la commande** : l'expéditeur à l'enlèvement, ou le destinataire à la remise. | 2026-10-23 |
-| D4 | Le livreur encaisse les frais et, **en option, le prix de la marchandise** pour le compte du client (contre-remboursement, payé par le destinataire à la remise). *Interprétation à confirmer.* | 2026-10-23 |
+| D4 | Le livreur encaisse les frais et, **en option, le prix de la marchandise** pour le compte du client (contre-remboursement, payé par le destinataire à la remise). *Interprétation confirmée par Franck le 2026-10-24.* | 2026-10-23 |
 | D5 | Les livreurs `find_delivery_mobile` sont des **indépendants payés à la course**. | 2026-10-23 |
 | D6 | Un indépendant touche **95 % du prix client**, soit la même part qu'un livreur Ewuang (grille `partenaire_tarifs`). Le livreur gagne autant quelle que soit sa flotte. find_delivery garde 5 %. | 2026-10-23 |
 | D7 | Ewuang est une **flotte à égalité** avec find_delivery_mobile : pas de priorité entre les deux. | 2026-10-23 |
@@ -226,7 +226,7 @@ un indépendant.
 
 Le livreur doit alors **15 100** à find_delivery, qui doit **15 000** au client.
 
-**Choix faits en cours de route (à confirmer par Franck)** :
+**Choix faits en cours de route (confirmés par Franck le 2026-10-24)** :
 - **« Suspension » = plus de nouvelle course**, pas le compte suspendu. Le blocage est
   calculé à chaque appel et se lève seul dès que le versement est saisi. Les courses
   en main continuent (un colis ne reste pas en route), et le livreur garde l'accès à
@@ -267,6 +267,9 @@ Le livreur doit alors **15 100** à find_delivery, qui doit **15 000** au client
 - [x] Migration `20261024130000_registre_especes` appliquée sur Neon le 2026-10-24
       (après un essai à blanc) : table vide, trigger d'immuabilité en place.
 - [ ] Table de paramètres : reportée (voir ci-dessus).
+- [x] Garde-fous (2026-10-24) : `destinataire` et `colis` exigés à la création
+      (`@IsDefined`, 400 au lieu d'une 500) ; `scripts/reinitialiser-mot-de-passe.mjs`
+      pour tout compte (les jetons émis restent valides jusqu'à expiration).
 
 ### Phase 4 — Ewuang, flotte à égalité (contrat v2)
 
@@ -274,7 +277,7 @@ Voir le brouillon de la v2. Code écrit et vérifié le 2026-10-24 (tests, types
 Schémas appliqués le 2026-10-24 (étapes 1 et 3 ci-dessous) ; **le code n'est pas
 encore déployé**.
 
-**Choix faits en cours de route (à confirmer par Franck)** :
+**Choix faits en cours de route (confirmés par Franck le 2026-10-24)** :
 - **`paiement.frais` ajouté au contrat** : le livreur Ewuang encaisse le prix de NOTRE
   client (2 000), pas le tarif Ewuang (1 900 depuis D11). Sans ce champ, la commission
   de find_delivery était perdue sur chaque course livrée par Ewuang.
@@ -309,14 +312,22 @@ encore déployé**.
       ne remontait pas), URL de réservation, forfait retour.
 - [x] Côté `ewuang_livreur` : montant à encaisser dans chaque confirmation, arrivée,
       échec de remise avec motif, retour.
-- [ ] Règlement périodique entre Ewuang et find_delivery (relevé) : à écrire à partir
-      des missions terminées (encaissé − tarif − forfait, par mission).
+- [x] Règlement périodique entre Ewuang et find_delivery (relevé) : c'est le solde du
+      compte « Ewuang » au registre (ligne suivante), réglé contre reçu sur `/admin/especes`.
 - [x] Côté find_delivery : compte « Ewuang » au registre (migration
       `20261024150000_compte_ewuang`, appliquée le 2026-10-24 après un essai à blanc).
       Le webhook écrit, dans la transaction de l'événement : l'encaissement de son
       livreur (+), le coût de la course à la fin (− `tarifEwuang`, + forfait sur un
       retour), la marchandise due au client. API ADMIN : `GET /admin/especes/ewuang`,
       règlements reçus et versés contre reçu. Le solde du compte EST le relevé.
+- [x] Contrôle des encaissements Ewuang (2026-10-24) : `GET /admin/especes/ewuang/ecarts`
+      liste les étapes (enlèvement, remise, retour) d'une course Ewuang en espèces dont
+      l'encaissement au registre diffère de l'attendu — typiquement un `mission.livree`
+      sans bloc `encaissement`, qui inscrit le coût sans l'argent et fausse le relevé en
+      faveur d'Ewuang. Alerte en tête de `/admin/especes`. Calculé, rien de stocké.
+      **Limite** : le registre n'a pas d'écriture manuelle pour combler l'écart (le CHECK
+      `origine` interdit un `ENCAISSEMENT_EWUANG` saisi par un ADMIN) ; on le règle avec
+      Ewuang, hors registre, tant qu'aucune migration ne l'ouvre.
 
 **Ordre de mise en service — à respecter, chaque étape casse si la précédente manque** :
 1. ✅ Neon : migrations `20261024130000_registre_especes` puis
@@ -333,7 +344,8 @@ encore déployé**.
 - [x] Aligner la grille `partenaire_tarifs` de find_delivery chez Ewuang (D11) :
       `tarif_partenaire` = `remuneration_livreur` pour les 9 lignes. Appliqué le
       2026-10-24 (`ewuang-web/sql/partenaire_tarifs_find_delivery_sans_marge.sql`).
-- [ ] Échec de remise et retour à l'expéditeur côté Ewuang (nouvel état du contrat).
+- [x] Échec de remise et retour à l'expéditeur côté Ewuang (nouvel état du contrat) :
+      fait avec `update.ts`, `arrivee.ts` et `sql/partenaires_contrat_v2.sql` (ci-dessus).
 
 ## 5. Ce qui n'est pas dans ce plan
 

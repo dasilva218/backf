@@ -56,6 +56,21 @@ type Mouvement = Prisma.MouvementEspecesGetPayload<{ select: typeof CHAMPS_MOUVE
 /** Mouvements montés dans un relevé de livreur ou de client. */
 const LIMITE_RELEVE = 30;
 
+/** Écarts d'encaissement Ewuang servis à l'écran, les plus récents d'abord. */
+const LIMITE_ECARTS = 100;
+
+/** Une étape de course Ewuang dont l'encaissement au registre n'est pas celui attendu. */
+export interface EcartEwuang {
+    livraisonId: string;
+    referenceExterne: string | null;
+    statutEwuang: string | null;
+    livreurNom: string | null;
+    etape: 'enlevement' | 'remise' | 'retour';
+    attendu: number;
+    inscrit: number;
+    faitAt: Date;
+}
+
 @Injectable()
 export class EspecesService {
     constructor(private readonly prisma: PrismaService) { }
@@ -250,6 +265,47 @@ export class EspecesService {
             }),
         ]);
         return { du, mouvements: mouvements.map(vueMouvement) };
+    }
+
+    /**
+     * Étapes de courses Ewuang payées en espèces dont l'encaissement inscrit au
+     * registre diffère de ce que le livreur Ewuang devait encaisser.
+     *
+     * Le cas visé : un `mission.livree` sans bloc `encaissement` (Ewuang encore en
+     * v1, ancienne application livreur, champ illisible). Le coût de la course est
+     * alors inscrit sans l'encaissement, et le relevé penche à tort vers Ewuang.
+     * Rien n'est stocké : l'écart disparaît dès que le registre porte le montant.
+     *
+     * Les montants attendus sont le miroir SQL de `calculerEncaissements` et
+     * `aEncaisserAuRetour` (src/livraisons/encaissement.ts) : à modifier ensemble.
+     * Ewuang encaisse `tarif`, notre prix client (`paiement.frais`).
+     */
+    ecartsEwuang() {
+        return this.prisma.$queryRaw<EcartEwuang[]>`
+            WITH c AS (
+                SELECT "id", "referenceExterne", "statutEwuang", "livreurNom",
+                       COALESCE("tarif", 0) AS "tarif", "payeur"::text AS "payeur",
+                       "montantMarchandise", "dateRecuperation", "dateLivraison", "dateRetour"
+                  FROM "Livraison"
+                 WHERE "flotte"::text = 'EWUANG' AND "payeur" IS NOT NULL
+                   AND ("dateRecuperation" IS NOT NULL OR "dateLivraison" IS NOT NULL OR "dateRetour" IS NOT NULL)
+            ), e AS (
+                SELECT c."id", c."referenceExterne", c."statutEwuang", c."livreurNom", v."etape", v."attendu", v."faitAt"
+                  FROM c CROSS JOIN LATERAL (VALUES
+                    ('enlevement', CASE WHEN c."payeur" = 'EXPEDITEUR' THEN c."tarif" ELSE 0 END, c."dateRecuperation"),
+                    ('remise', CASE WHEN c."payeur" = 'EXPEDITEUR' THEN c."montantMarchandise"
+                                    ELSE c."tarif" + c."montantMarchandise" END, c."dateLivraison"),
+                    ('retour', CASE WHEN c."payeur" = 'DESTINATAIRE' THEN c."tarif" ELSE 0 END, c."dateRetour")
+                  ) AS v("etape", "attendu", "faitAt")
+                 WHERE v."faitAt" IS NOT NULL
+            )
+            SELECT e."id" AS "livraisonId", e."referenceExterne", e."statutEwuang", e."livreurNom",
+                   e."etape", e."attendu"::int AS "attendu", COALESCE(m."montant", 0)::int AS "inscrit", e."faitAt"
+              FROM e
+              LEFT JOIN "MouvementEspeces" m ON m."cle" = e."id" || ':ewuang:' || e."etape"
+             WHERE COALESCE(m."montant", 0) <> e."attendu"
+             ORDER BY e."faitAt" DESC
+             LIMIT ${LIMITE_ECARTS}`;
     }
 
     /** Ewuang nous règle le relevé. Au plus ce qu'il nous doit. */

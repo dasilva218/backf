@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { appelerApi, type ReponseApi } from "@/lib/api";
 import { formaterDate, formaterMontant, LIBELLES_TYPE_CLIENT } from "@/lib/affichage";
-import type { DuClient, EncoursLivreur, MouvementEspeces, ReleveEwuang } from "@/lib/types";
+import type { DuClient, EcartEwuang, EncoursLivreur, MouvementEspeces, ReleveEwuang } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { FormulaireReglement } from "./formulaire-reglement";
 
@@ -32,11 +33,12 @@ const LIBELLES_MOUVEMENT: Record<string, string> = {
  * autres (une section en erreur dit pourquoi, les autres restent lisibles).
  */
 export default async function PageEspeces() {
-  const [livreurs, clients, ewuang, journal] = await Promise.all([
+  const [livreurs, clients, ewuang, journal, ecarts] = await Promise.all([
     appelerApi<EncoursLivreur[]>("/admin/especes/livreurs"),
     appelerApi<DuClient[]>("/admin/especes/clients"),
     appelerApi<ReleveEwuang>("/admin/especes/ewuang"),
     appelerApi<MouvementEspeces[]>("/admin/especes/mouvements?limite=50"),
+    appelerApi<EcartEwuang[]>("/admin/especes/ewuang/ecarts"),
   ]);
 
   return (
@@ -49,7 +51,9 @@ export default async function PageEspeces() {
         </p>
       </div>
 
-      <Synthese livreurs={livreurs} clients={clients} ewuang={ewuang} />
+      <Synthese livreurs={livreurs} clients={clients} ewuang={ewuang} ecarts={ecarts} />
+
+      <EcartsEwuang reponse={ecarts} />
 
       <Section
         titre="Livreurs"
@@ -224,15 +228,18 @@ function Synthese({
   livreurs,
   clients,
   ewuang,
+  ecarts,
 }: {
   livreurs: ReponseApi<EncoursLivreur[]>;
   clients: ReponseApi<DuClient[]>;
   ewuang: ReponseApi<ReleveEwuang>;
+  ecarts: ReponseApi<EcartEwuang[]>;
 }) {
   const detenu = livreurs.ok ? livreurs.donnees.reduce((s, l) => s + Math.max(0, l.solde), 0) : null;
   const bloques = livreurs.ok ? livreurs.donnees.filter((l) => l.blocage).length : null;
   const aReverser = clients.ok ? clients.donnees.reduce((s, c) => s + c.du, 0) : null;
   const releve = ewuang.ok ? ewuang.donnees.du : null;
+  const nbEcarts = ecarts.ok ? ecarts.donnees.length : 0;
 
   const tuiles = [
     {
@@ -245,8 +252,11 @@ function Synthese({
     {
       libelle: releve !== null && releve < 0 ? "Dû à Ewuang" : "Dû par Ewuang",
       valeur: releve === null ? null : Math.abs(releve),
-      detail: "Relevé entre les deux flottes",
-      alerte: false,
+      detail:
+        nbEcarts > 0
+          ? `Faussé : ${nbEcarts} encaissement${nbEcarts > 1 ? "s" : ""} à vérifier`
+          : "Relevé entre les deux flottes",
+      alerte: nbEcarts > 0,
     },
   ];
 
@@ -260,6 +270,74 @@ function Synthese({
         </Card>
       ))}
     </div>
+  );
+}
+
+const LIBELLES_ETAPE: Record<EcartEwuang["etape"], string> = {
+  enlevement: "Enlèvement",
+  remise: "Remise",
+  retour: "Retour",
+};
+
+/**
+ * Encaissements de livreurs Ewuang absents ou faux au registre. Rendu seulement
+ * s'il y en a (ou si la lecture échoue) : c'est une alerte, pas une section.
+ */
+function EcartsEwuang({ reponse }: { reponse: ReponseApi<EcartEwuang[]> }) {
+  if (reponse.ok && reponse.donnees.length === 0) return null;
+  return (
+    <Card className="gap-4 overflow-hidden border-destructive/40 pb-0">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base text-destructive">
+          <AlertTriangle className="size-4" aria-hidden />
+          Encaissements Ewuang à vérifier
+        </CardTitle>
+        <CardDescription>
+          Ewuang a signalé ces étapes sans le montant encaissé attendu : le coût de la course est inscrit, pas
+          l&apos;argent reçu par son livreur, et le relevé Ewuang penche à tort en sa faveur. Vérifiez avec Ewuang
+          avant tout règlement.
+        </CardDescription>
+      </CardHeader>
+      <div className="border-t">
+        {!reponse.ok ? (
+          <p className="px-6 py-4 text-sm text-destructive">Lecture impossible : {reponse.message}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Course</TableHead>
+                <TableHead>Étape</TableHead>
+                <TableHead>Le</TableHead>
+                <TableHead>Livreur Ewuang</TableHead>
+                <TableHead className="text-right">Attendu</TableHead>
+                <TableHead className="text-right">Inscrit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reponse.donnees.map((e) => (
+                <TableRow key={`${e.livraisonId}:${e.etape}`}>
+                  <TableCell className="whitespace-nowrap">
+                    <Link href={`/admin/courses/${e.livraisonId}`} className="font-medium hover:text-primary hover:underline">
+                      {e.referenceExterne ?? e.livraisonId}
+                    </Link>
+                    {e.statutEwuang && <span className="block text-xs text-muted-foreground">{e.statutEwuang}</span>}
+                  </TableCell>
+                  <TableCell>{LIBELLES_ETAPE[e.etape]}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formaterDate(e.faitAt)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{e.livreurNom ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
+                    {formaterMontant(e.attendu)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right tabular-nums text-destructive">
+                    {formaterMontant(e.inscrit)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </Card>
   );
 }
 

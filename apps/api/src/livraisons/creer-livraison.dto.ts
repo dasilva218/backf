@@ -173,11 +173,14 @@ export class CreerLivraisonDto {
     enlevement?: EnlevementDto;
 
     @ApiProperty({ type: DestinataireDto })
+    // Même raison que `paiement` ci-dessous : sans `@IsDefined`, un bloc absent passe.
+    @IsDefined({ message: 'Veuillez fournir le destinataire (nom, adresse, contact)' })
     @ValidateNested()
     @Type(() => DestinataireDto)
     destinataire: DestinataireDto;
 
     @ApiProperty({ type: ColisDto })
+    @IsDefined({ message: 'Veuillez décrire le colis (colis.description)' })
     @ValidateNested()
     @Type(() => ColisDto)
     colis: ColisDto;

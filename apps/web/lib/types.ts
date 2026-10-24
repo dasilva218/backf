@@ -212,6 +212,18 @@ export interface ReleveEwuang {
   mouvements: MouvementEspeces[];
 }
 
+/** Étape d'une course Ewuang dont l'encaissement au registre diffère de l'attendu (`GET /admin/especes/ewuang/ecarts`). */
+export interface EcartEwuang {
+  livraisonId: string;
+  referenceExterne: string | null;
+  statutEwuang: string | null;
+  livreurNom: string | null;
+  etape: "enlevement" | "remise" | "retour";
+  attendu: number;
+  inscrit: number;
+  faitAt: string;
+}
+
 export interface ResultatTransmission {
   transmise: boolean;
   livraison: LivraisonDetail;

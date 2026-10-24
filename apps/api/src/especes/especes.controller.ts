@@ -46,6 +46,15 @@ export class AdminEspecesController {
         return this.especes.releveEwuang();
     }
 
+    @Get('ewuang/ecarts')
+    @ApiOperation({
+        summary: 'Étapes de courses Ewuang dont l’encaissement au registre diffère de l’attendu',
+        description: 'Typiquement une course livrée sans bloc `encaissement` dans le webhook : le relevé Ewuang est alors faussé. 100 au plus, les plus récentes d’abord.',
+    })
+    ecartsEwuang() {
+        return this.especes.ecartsEwuang();
+    }
+
     @Post('ewuang/reglements-recus')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Ewuang nous règle le relevé, contre un reçu' })

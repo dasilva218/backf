@@ -56,3 +56,20 @@ describe('CreerLivraisonDto.paiement', () => {
         expect(await erreursPaiement({ payeur: 'expediteur', frais: 0 })).not.toHaveLength(0);
     });
 });
+
+describe('CreerLivraisonDto : blocs obligatoires', () => {
+    async function erreursSans(propriete: 'destinataire' | 'colis') {
+        const { [propriete]: _retire, ...reste } = BASE;
+        const dto = plainToInstance(CreerLivraisonDto, { ...reste, paiement: { payeur: 'expediteur' } });
+        const erreurs = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+        return erreurs.filter((e) => e.property === propriete);
+    }
+
+    it('exige le destinataire', async () => {
+        expect(await erreursSans('destinataire')).not.toHaveLength(0);
+    });
+
+    it('exige le colis', async () => {
+        expect(await erreursSans('colis')).not.toHaveLength(0);
+    });
+});
