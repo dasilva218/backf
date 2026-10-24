@@ -189,13 +189,20 @@ Next 16 App Router, Tailwind v4 + primitives shadcn recopiées d'`ewuang-web` ([
 - **Session = le JWT de l'API dans un cookie httpOnly `fd_session`** ([lib/session.ts](apps/web/lib/session.ts)), qui expire avec le jeton. Pas de jeton de rafraîchissement côté API : reconnexion toutes les 30 min (`JWT_EXPIRES_IN`).
 - **Le navigateur n'appelle jamais l'API.** Tout passe par [lib/api.ts](apps/web/lib/api.ts) (`server-only`) depuis les Server Components et les Server Actions ([app/actions/](apps/web/app/actions/)). D'où `API_URL` sans `NEXT_PUBLIC_` (défaut en dev : `http://localhost:3001/api/v1`, obligatoire en prod) et aucun CORS à ouvrir.
 - Un 401 de l'API ou un jeton expiré/d'un autre rôle mène à **`/deconnexion`** (Route Handler) : un Server Component ne peut pas effacer de cookie, et sans ce détour `proxy.ts` renverrait vers l'espace en boucle.
-- L'inscription n'envoie **aucun rôle** : l'API crée toujours un `CLIENT` (`auth.service.ts`) et rejette un champ `role` (`forbidNonWhitelisted`). La connexion refuse tout jeton d'un autre rôle ; un jeton émis avant le 2026-10-23 (rôle `BOUTIQUE`) mène à `/deconnexion?motif=role`, puis la reconnexion en délivre un neuf.
+- L'inscription n'envoie **aucun rôle** : l'API crée toujours un `CLIENT` (`auth.service.ts`) et rejette un champ `role` (`forbidNonWhitelisted`). La connexion accepte `CLIENT` et `ADMIN` (chacun vers son espace) et refuse `LIVREUR` ; un jeton émis avant le 2026-10-23 (rôle `BOUTIQUE`) mène à `/deconnexion?motif=role`, puis la reconnexion en délivre un neuf.
 - Le formulaire de course n'a **pas de payeur par défaut** (décision D3 : le client choisit). Ce qui est encaissé à l'enlèvement et à la remise se calcule dans `calculerEncaissements` ([lib/affichage.ts](apps/web/lib/affichage.ts)).
 - **Formulaires : `onSubmit` + `startTransition`, jamais `<form action={…}>`** ([use-retour-action.ts](apps/web/components/use-retour-action.ts)). React 19 vide les champs d'un `<form action>` à chaque fin d'action, erreur comprise.
 - Règle UX : toute action serveur affiche l'**overlay plein écran** ([overlay-chargement.tsx](apps/web/components/overlay-chargement.tsx), 400 ms minimum) puis un toast sonner.
 - Le devis s'affiche en direct depuis `GET /tarifs`, chargé une fois côté serveur. Seul `tarif` est montré.
 - Dates formatées avec `timeZone: 'Africa/Libreville'` ([lib/affichage.ts](apps/web/lib/affichage.ts)) ; la date souhaitée saisie (`datetime-local`) est envoyée en `+01:00`.
 - Statut affiché : `statutEwuang` fait foi dès que la course est transmise ; avant, « Non transmise » (bouton Renvoyer) ou « Annulée ».
+
+### Espace d'administration (`/admin`, [app/(admin)/admin/](apps/web/app/(admin)/admin/))
+
+Le bureau find_delivery, dans le même site que les clients : **Livreurs** (dossiers à valider ou refuser), **Espèces** (livreurs, clients, Ewuang, règlements contre reçu, journal), **Courses** (toutes, des deux flottes ; clôture sans code d'une course de notre flotte en cours, code bloqué ou perdu : `POST /admin/courses/:id/cloturer`).
+- Chaque rôle a son espace : `CLIENT` → `/courses`, `ADMIN` → `/admin` (`ACCUEIL_PAR_ROLE`, lib/session.ts, avec son miroir dans proxy.ts). `proxy.ts` renvoie chacun chez lui ; chaque layout appelle `exigerSession("<ROLE>")` ; **chaque Server Action admin la rappelle aussi** ([app/actions/admin.ts](apps/web/app/actions/admin.ts)) : une action est un point d'entrée public que le layout ne protège pas. L'API refait le contrôle (`@Roles(ADMIN)`).
+- Un LIVREUR qui tente de se connecter au site est renvoyé vers l'application.
+- **Créer un compte ADMIN** : aucune route ne donne ce rôle. Depuis `apps/api`, `ADMIN_MOT_DE_PASSE` en variable d'environnement, puis `node scripts/creer-admin.mjs <email> <prénom> <nom>` ([scripts/creer-admin.mjs](apps/api/scripts/creer-admin.mjs)). Il écrit dans la base de `DATABASE_URL` et refuse un e-mail déjà inscrit (pas de promotion d'un compte existant).
 
 ## Points connus à ne pas prendre pour des régressions
 

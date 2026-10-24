@@ -7,7 +7,7 @@ import { exigerSession } from "@/lib/session";
 import { NavigationEspace } from "./navigation";
 
 export default async function LayoutEspace({ children }: { children: React.ReactNode }) {
-  const { email } = await exigerSession();
+  const { email } = await exigerSession("CLIENT");
 
   return (
     <div className="flex min-h-dvh flex-col">

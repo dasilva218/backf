@@ -47,15 +47,28 @@ export async function lireSessionOptimiste(): Promise<{ email: string } | null> 
   return { email: charge.email };
 }
 
+/** Les deux rôles qui ont un espace dans ce site : client et administration. */
+export type RoleEspace = "CLIENT" | "ADMIN";
+
+/** L'espace d'accueil de chaque rôle, après la connexion. */
+export const ACCUEIL_PAR_ROLE: Record<RoleEspace, string> = { CLIENT: "/courses", ADMIN: "/admin" };
+
+export function estRoleEspace(role: string | undefined): role is RoleEspace {
+  return role === "CLIENT" || role === "ADMIN";
+}
+
 /**
- * Exige une session de client valide, sinon redirige.
+ * Exige une session valide du rôle de l'espace, sinon redirige.
  *
  * Mémoïsée par rendu (`cache`) : le layout et la page l'appellent tous deux
  * sans relire le cookie. Un jeton expiré ou d'un autre rôle passe par
  * `/deconnexion`, qui seul peut effacer le cookie depuis un rendu — sans quoi
  * `proxy.ts` renverrait aussitôt vers l'espace, en boucle.
+ *
+ * Sans rôle : n'importe lequel des deux, pour `appelerApi`. Ce n'est PAS une
+ * garde d'accès : chaque layout passe son rôle, et l'API refait le contrôle.
  */
-export const exigerSession = cache(async () => {
+export const exigerSession = cache(async (role?: RoleEspace) => {
   const jeton = (await cookies()).get(NOM_COOKIE_SESSION)?.value;
   const charge = lireChargeJeton(jeton);
 
@@ -63,7 +76,9 @@ export const exigerSession = cache(async () => {
   if (jetonExpire(charge)) redirect("/deconnexion?motif=expiree");
   // Un jeton émis avant le 2026-10-23 porte encore le rôle BOUTIQUE : il passe
   // par ici une fois, puis la reconnexion en délivre un nouveau.
-  if (charge.role !== "CLIENT") redirect("/deconnexion?motif=role");
+  if (!estRoleEspace(charge.role) || (role && charge.role !== role)) {
+    redirect("/deconnexion?motif=role");
+  }
 
-  return { jeton, email: charge.email };
+  return { jeton, email: charge.email, role: charge.role };
 });

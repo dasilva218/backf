@@ -159,6 +159,26 @@ export class LivreursController {
     }
 }
 
+/** Interventions d'un ADMIN sur les courses de la flotte find_delivery. */
+@ApiTags('Administration — courses')
+@Roles(UserRole.ADMIN)
+@Controller('admin/courses')
+export class AdminCoursesController {
+    constructor(private readonly courses: LivreurCoursesService) { }
+
+    @Post(':id/cloturer')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Clôture sans code une course en cours de la flotte find_delivery',
+        description: "Code bloqué après 5 essais, ou perdu par le destinataire. `montant_encaisse` = exactement ce qui est dû à la remise, comme pour le livreur ; les écritures au registre sont les mêmes.",
+    })
+    @ApiResponse({ status: 400, description: 'Montant incorrect.' })
+    @ApiResponse({ status: 409, description: 'Course pas en cours de livraison.' })
+    cloturer(@CurrentUser() admin: Utilisateur, @Param('id') id: string, @Body() dto: EncaissementDto) {
+        return this.courses.cloturerParAdmin(admin.id, id, dto);
+    }
+}
+
 /** Validation des dossiers, par un ADMIN, pièces vérifiées au bureau. */
 @ApiTags('Administration — livreurs')
 @Roles(UserRole.ADMIN)

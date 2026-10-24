@@ -332,6 +332,34 @@ describe('livrer', () => {
     });
 });
 
+describe('cloturerParAdmin', () => {
+    const bloquee = () => aLui({ statut: StatutLivraison.EN_COURS, tentativesCode: 5 });
+
+    it('code bloqué : livrée sans code, montant exact exigé, mêmes écritures que le livreur', async () => {
+        f.prisma.livraison.findFirst.mockResolvedValue(bloquee());
+        await expect(f.service.cloturerParAdmin('u-admin', 'l-1', { montant_encaisse: 2_000 })).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        expect(f.prisma.livraison.updateMany).not.toHaveBeenCalled();
+
+        expect(await f.service.cloturerParAdmin('u-admin', 'l-1', { montant_encaisse: 17_000 })).toEqual({
+            id: 'l-1',
+            statut: StatutLivraison.LIVREE,
+        });
+        const livree = f.prisma.livraison.updateMany.mock.calls[0][0];
+        expect(livree.where).toEqual({ id: 'l-1', livreurId: 'lv-1', statut: StatutLivraison.EN_COURS });
+        expect(livree.data).toMatchObject({ statut: StatutLivraison.LIVREE, montantEncaisseRemise: 17_000 });
+        expect(ecritures().map((e) => e.type)).toEqual(['ENCAISSEMENT', 'REMUNERATION', 'MARCHANDISE']);
+    });
+
+    it('course pas en cours : 409 ; course d’une autre flotte : 404', async () => {
+        f.prisma.livraison.findFirst.mockResolvedValue(aLui());
+        await expect(f.service.cloturerParAdmin('u-admin', 'l-1', {})).rejects.toBeInstanceOf(ConflictException);
+        f.prisma.livraison.findFirst.mockResolvedValue(null);
+        await expect(f.service.cloturerParAdmin('u-admin', 'l-1', {})).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
 describe('échec et retour', () => {
     it('échec refusé avant 10 min sur place', async () => {
         f.prisma.livraison.findFirst.mockResolvedValue(

@@ -417,10 +417,42 @@ export class LivreurCoursesService {
             );
         }
 
+        await this.remettre(course, livreur.id, du, marchandise);
+        return this.lire(userId, id);
+    }
+
+    /**
+     * Clôture par un ADMIN d'une course de la flotte find_delivery « en cours » :
+     * code bloqué après 5 essais, ou perdu par le destinataire. L'admin a joint
+     * le destinataire et le livreur avant ; il n'a pas de code à fournir, mais
+     * l'argent suit les mêmes règles que pour le livreur (montant exact, R2) et
+     * les mêmes écritures au registre.
+     */
+    async cloturerParAdmin(adminUserId: string, id: string, dto: EncaissementDto) {
+        const course = await this.prisma.livraison.findFirst({
+            where: { id, flotte: Flotte.FIND_DELIVERY },
+            select: CHAMPS,
+        });
+        if (!course?.livreurId) throw new NotFoundException('Course de la flotte find_delivery introuvable');
+        this.exigerStatut(course, StatutLivraison.EN_COURS, 'Seule une course en cours de livraison se clôture ici');
+
+        const du = this.encaissements(course).remise;
+        this.verifierMontant(du, dto.montant_encaisse, 'à la remise');
+        await this.remettre(course, course.livreurId, du, this.marchandiseDue(course));
+
+        // Trace de qui a clôturé sans code : il n'y a pas de colonne pour, et
+        // la décision doit pouvoir se retrouver.
+        this.logger.warn(`Course ${id} clôturée sans code par l'ADMIN ${adminUserId} (essais : ${course.tentativesCode})`);
+        return { id, statut: StatutLivraison.LIVREE };
+    }
+
+    /** La remise elle-même : statut, compteur du livreur, registre, dans UNE transaction. */
+    private async remettre(course: Course, livreurId: string, du: number, marchandise: EcritureCourse[]): Promise<void> {
+        const id = course.id;
         const maintenant = new Date();
         await this.prisma.$transaction(async (tx) => {
             const livree = await tx.livraison.updateMany({
-                where: { id, livreurId: livreur.id, statut: StatutLivraison.EN_COURS },
+                where: { id, livreurId, statut: StatutLivraison.EN_COURS },
                 data: {
                     statut: StatutLivraison.LIVREE,
                     dateLivraison: maintenant,
@@ -428,20 +460,19 @@ export class LivreurCoursesService {
                 },
             });
             if (livree.count === 0) throw new ConflictException('Cette course a changé entre-temps');
-            await tx.livreur.update({ where: { id: livreur.id }, data: { nombreLivraisons: { increment: 1 } } });
+            await tx.livreur.update({ where: { id: livreurId }, data: { nombreLivraisons: { increment: 1 } } });
             await this.especes.ecrireCourse(tx, [
-                { type: TypeMouvementEspeces.ENCAISSEMENT, livraisonId: id, etape: 'remise', montant: du, livreurId: livreur.id },
+                { type: TypeMouvementEspeces.ENCAISSEMENT, livraisonId: id, etape: 'remise', montant: du, livreurId },
                 {
                     type: TypeMouvementEspeces.REMUNERATION,
                     livraisonId: id,
                     etape: 'remuneration',
                     montant: course.remunerationLivreur ?? calculerRemunerationLivreur(course.tarif ?? 0),
-                    livreurId: livreur.id,
+                    livreurId,
                 },
                 ...marchandise,
             ]);
         });
-        return this.lire(userId, id);
     }
 
     /** Échec de remise, après 10 min sur place (R3) : le colis repart à l'expéditeur. */

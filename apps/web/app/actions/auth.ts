@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { appelerApiPublique } from "@/lib/api";
 import { lireChargeJeton } from "@/lib/jeton";
-import { fermerSession, ouvrirSession } from "@/lib/session";
+import { ACCUEIL_PAR_ROLE, estRoleEspace, fermerSession, ouvrirSession } from "@/lib/session";
 import type { EtatAction } from "@/lib/types";
 
 interface ReponseAuth {
@@ -34,14 +34,16 @@ export async function seConnecter(_etat: EtatAction, formData: FormData): Promis
     };
   }
 
-  // Cet espace est celui des clients. Un compte ADMIN ou LIVREUR obtiendrait
-  // un jeton valide, mais chaque écran lui répondrait 403 ou vide.
-  if (lireChargeJeton(reponse.donnees.accessToken)?.role !== "CLIENT") {
-    return { ok: false, message: "Cet espace est réservé aux comptes client." };
+  // Clients et administration ont chacun leur espace ici. Un LIVREUR passe par
+  // l'application find_delivery_mobile : chaque écran du site lui répondrait
+  // 403 ou vide.
+  const role = lireChargeJeton(reponse.donnees.accessToken)?.role;
+  if (!estRoleEspace(role)) {
+    return { ok: false, message: "Les livreurs se connectent depuis l'application find_delivery." };
   }
 
   await ouvrirSession(reponse.donnees.accessToken);
-  redirect("/courses");
+  redirect(ACCUEIL_PAR_ROLE[role]);
 }
 
 export async function sInscrire(_etat: EtatAction, formData: FormData): Promise<EtatAction> {

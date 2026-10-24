@@ -103,6 +103,15 @@ export interface ChargeEwuang {
   date_souhaitee?: string;
 }
 
+/** Champs que l'API ne sert qu'à un ADMIN (livraisons.service.ts, CHAMPS_ADMIN). */
+export interface LivraisonAdmin extends Livraison {
+  clientId: string | null;
+  commission: number | null;
+  tarifEwuang: number | null;
+  remunerationLivreur: number | null;
+  tentativesCode: number;
+}
+
 export interface LivraisonDetail extends Livraison {
   chargeEwuang: ChargeEwuang | null;
 }
@@ -126,6 +135,81 @@ export interface ReleveClient {
     recu: string | null;
     createdAt: string;
   }[];
+}
+
+// ─── Administration ─────────────────────────────────────────────────────────
+
+export const STATUTS_DOSSIER = ["EN_ATTENTE", "VALIDE", "REFUSE"] as const;
+export type StatutDossier = (typeof STATUTS_DOSSIER)[number];
+
+/** `GET /admin/livreurs` (livreurs.service.ts, CHAMPS_ADMIN). */
+export interface LivreurAdmin {
+  id: string;
+  firstname: string;
+  lastname: string;
+  phoneAirtel: string | null;
+  phoneMoov: string | null;
+  moyenTransport: string;
+  immatriculation: string | null;
+  zoneGeographique: string[];
+  statutDossier: StatutDossier;
+  motifRefus: string | null;
+  dossierTraiteAt: string | null;
+  nombreLivraisons: number;
+  estDisponible: boolean;
+  createdAt: string;
+  user: { email: string; status: string };
+}
+
+/** État du compte d'espèces d'un livreur (especes.ts, `etatLivreur`). */
+export interface EtatEspecesLivreur {
+  solde: number;
+  plafond: number;
+  depuis: string | null;
+  echeance: string | null;
+  blocage: string | null;
+}
+
+/** `GET /admin/especes/livreurs`. */
+export interface EncoursLivreur extends EtatEspecesLivreur {
+  livreur: { id: string; firstname: string; lastname: string; phoneAirtel: string | null; phoneMoov: string | null } | null;
+}
+
+/** `GET /admin/especes/clients`. */
+export interface DuClient {
+  client: {
+    id: string;
+    type: TypeClient;
+    raisonSociale: string | null;
+    firstname: string;
+    lastname: string;
+    phoneAirtel: string | null;
+    phoneMoov: string | null;
+  } | null;
+  du: number;
+}
+
+/** Un mouvement du registre des espèces, tel que l'API le sert. */
+export interface MouvementEspeces {
+  id: string;
+  type: string;
+  montant: number;
+  /** +1 : augmente le solde du compte ; −1 : le diminue. */
+  sens: 1 | -1;
+  livraisonId: string | null;
+  referenceCourse: string | null;
+  recu: string | null;
+  note: string | null;
+  createdAt: string;
+  livreurId?: string | null;
+  clientId?: string | null;
+}
+
+/** `GET /admin/especes/ewuang`. */
+export interface ReleveEwuang {
+  /** > 0 : Ewuang nous doit ; < 0 : nous lui devons. */
+  du: number;
+  mouvements: MouvementEspeces[];
 }
 
 export interface ResultatTransmission {

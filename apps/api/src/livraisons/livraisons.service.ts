@@ -97,6 +97,8 @@ const CHAMPS_ADMIN = {
     commission: true,
     tarifEwuang: true,
     remunerationLivreur: true,
+    // L'écran ADMIN signale une course au code bloqué, à clôturer.
+    tentativesCode: true,
 } satisfies Prisma.LivraisonSelect;
 
 @Injectable()

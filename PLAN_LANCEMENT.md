@@ -201,7 +201,7 @@ Neon via `pg`. Code dans `apps/api/src/livreurs/`, application dans
 **Reporté** :
 - Notifications push des nouvelles courses. Sans elles, la liste se rafraîchit toutes
   les 20 s quand l'application est ouverte.
-- Écran ADMIN de validation des dossiers : seulement l'API pour l'instant (Swagger).
+- ~~Écran ADMIN de validation des dossiers~~ : fait avec l'espace `/admin` (phase 3).
 - Position en arrière-plan (écran éteint).
 - Dépôt des pièces du dossier depuis l'application.
 
@@ -252,9 +252,11 @@ Le livreur doit alors **15 100** à find_delivery, qui doit **15 000** au client
 - [x] Versement d'un livreur à find_delivery et paiement d'un livreur à solde
       négatif : saisis par un ADMIN, avec un reçu, au plus le solde, sous verrou.
 - [x] Reversement au client du montant de la marchandise, au plus ce qui lui est dû.
-- [x] API ADMIN : encours par livreur, dû par client, journal
-      (`/admin/especes/*`). **Les écrans web ADMIN restent à faire**, comme pour les
-      dossiers (Swagger en attendant).
+- [x] API ADMIN : encours par livreur, dû par client, journal (`/admin/especes/*`).
+- [x] Écrans web ADMIN (2026-10-24) : `/admin/livreurs` (dossiers), `/admin/especes`
+      (livreurs, clients, Ewuang, règlements contre reçu, journal), `/admin/courses`
+      (toutes les courses, clôture sans code d'une course au code bloqué). Compte
+      ADMIN créé par `apps/api/scripts/creer-admin.mjs`.
 - [x] Écritures du retour (R3) : frais de l'aller encaissés, gain + forfait au livreur.
 - [x] Plafond de 50 000 FCFA et délai de 48 h (R5) : plus de course proposée ni
       acceptée, motif affiché dans l'application.
