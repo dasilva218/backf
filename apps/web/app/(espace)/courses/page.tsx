@@ -101,7 +101,7 @@ function EncartMarchandise({ releve }: { releve: ReponseApi<ReleveClient> }) {
           <p className="text-sm text-muted-foreground">
             Prix de vos marchandises encaissé par nos livreurs à la remise
             {derniere ? `, dernier encaissement le ${formaterDate(derniere.createdAt)}` : ""}. Il vous est
-            remis au bureau find_delivery, contre un reçu.
+            remis au bureau Avoo, contre un reçu.
           </p>
         </div>
       </CardContent>

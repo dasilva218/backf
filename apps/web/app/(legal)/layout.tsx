@@ -10,7 +10,7 @@ export default function LayoutLegal({ children }: { children: React.ReactNode })
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-          <Link href="/" aria-label="find_delivery, accueil">
+          <Link href="/" aria-label="Avoo, accueil">
             <Logo />
           </Link>
           <Button asChild variant="ghost" size="sm">

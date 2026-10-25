@@ -45,7 +45,7 @@ export default async function PageProfil({
 
       {(bienvenue || !profil) && (
         <div role="status" className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-          <p className="font-medium">{bienvenue ? "Bienvenue sur find_delivery !" : "Profil à compléter"}</p>
+          <p className="font-medium">{bienvenue ? "Bienvenue sur Avoo !" : "Profil à compléter"}</p>
           <p className="text-muted-foreground">
             Renseignez votre profil pour pouvoir soumettre votre première course.
           </p>

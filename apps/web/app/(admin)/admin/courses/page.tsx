@@ -17,7 +17,7 @@ const LIMITE = 30;
 /** Au 5e code faux, la course ne se clôture plus que par un ADMIN (livreur-courses.service.ts). */
 const MAX_TENTATIVES_CODE = 5;
 
-const LIBELLES_FLOTTE: Record<Flotte, string> = { FIND_DELIVERY: "find_delivery", EWUANG: "Ewuang" };
+const LIBELLES_FLOTTE: Record<Flotte, string> = { FIND_DELIVERY: "Avoo", EWUANG: "Ewuang" };
 
 interface PageAdmin {
   donnees: LivraisonAdmin[];

@@ -14,7 +14,7 @@ export default function PageConfidentialite() {
   return (
     <DocumentLegal
       titre="Politique de confidentialité"
-      intro="Quelles données find_delivery collecte, pourquoi, avec qui elles sont partagées et comment exercer vos droits, au sens de la loi n°001/2011 du 25 septembre 2011 relative à la protection des données à caractère personnel, modifiée par la loi n°025/2023 du 12 juillet 2023."
+      intro="Quelles données Avoo collecte, pourquoi, avec qui elles sont partagées et comment exercer vos droits, au sens de la loi n°001/2011 du 25 septembre 2011 relative à la protection des données à caractère personnel, modifiée par la loi n°025/2023 du 12 juillet 2023."
     >
       <Article id="responsable" titre="1. Responsable du traitement">
         <p>
@@ -51,7 +51,7 @@ export default function PageConfidentialite() {
         </p>
         <p>
           Les pièces du dossier d&apos;un livreur sont vérifiées au bureau, en main propre : elles ne sont ni déposées ni
-          conservées sur find_delivery.
+          conservées sur Avoo.
         </p>
       </Article>
 
@@ -91,7 +91,7 @@ export default function PageConfidentialite() {
             <strong>Vous</strong> voyez le nom, le téléphone et le véhicule du livreur dès qu&apos;il accepte votre course.
           </li>
           <li>
-            <strong>L&apos;équipe find_delivery</strong>, pour le suivi des courses, la vérification des dossiers et les
+            <strong>L&apos;équipe Avoo</strong>, pour le suivi des courses, la vérification des dossiers et les
             règlements en espèces.
           </li>
           <li>
@@ -103,7 +103,7 @@ export default function PageConfidentialite() {
 
       <Article id="transferts" titre="5. Transferts hors du Gabon">
         <p>
-          La base de données de find_delivery est hébergée par Neon sur l&apos;infrastructure d&apos;Amazon Web Services,
+          La base de données d&apos;Avoo est hébergée par Neon sur l&apos;infrastructure d&apos;Amazon Web Services,
           aux États-Unis (région us-east-2). Vos données y sont donc transférées hors du Gabon, pour le seul besoin de
           leur stockage.
         </p>
@@ -129,7 +129,7 @@ export default function PageConfidentialite() {
 
       <Article id="cookies" titre="7. Cookies">
         <p>
-          find_delivery n&apos;utilise qu&apos;un seul cookie : celui de votre session, déposé à la connexion et nécessaire
+          Avoo n&apos;utilise qu&apos;un seul cookie : celui de votre session, déposé à la connexion et nécessaire
           pour accéder à votre espace. Il n&apos;est pas lisible par les scripts de la page et expire avec votre session.
           Aucun cookie de mesure d&apos;audience ou de publicité n&apos;est déposé.
         </p>

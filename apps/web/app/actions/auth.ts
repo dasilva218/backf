@@ -39,7 +39,7 @@ export async function seConnecter(_etat: EtatAction, formData: FormData): Promis
   // 403 ou vide.
   const role = lireChargeJeton(reponse.donnees.accessToken)?.role;
   if (!estRoleEspace(role)) {
-    return { ok: false, message: "Les livreurs se connectent depuis l'application find_delivery." };
+    return { ok: false, message: "Les livreurs se connectent depuis l'application Avoo." };
   }
 
   await ouvrirSession(reponse.donnees.accessToken);

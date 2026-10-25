@@ -75,7 +75,7 @@ const GARANTIES = [
 const QUESTIONS = [
   {
     q: "Qui livre mes colis ?",
-    r: "Des livreurs indépendants inscrits sur find_delivery, et ceux de notre partenaire Ewuang : le premier qui accepte la course l'exécute. Le nom et le téléphone du livreur s'affichent dès qu'il l'accepte.",
+    r: "Des livreurs indépendants inscrits sur Avoo, et ceux de notre partenaire Ewuang : le premier qui accepte la course l'exécute. Le nom et le téléphone du livreur s'affichent dès qu'il l'accepte.",
   },
   {
     q: "À quoi sert le code de remise ?",

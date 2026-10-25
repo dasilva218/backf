@@ -22,7 +22,7 @@ export default function PageConditions() {
       titre="Conditions d'utilisation"
       intro={
         <>
-          Ces conditions régissent l&apos;utilisation de find_delivery, édité par{" "}
+          Ces conditions régissent l&apos;utilisation d&apos;Avoo, édité par{" "}
           <Valeur valeur={EDITEUR.raisonSociale} quoi="raison sociale" /> (voir les{" "}
           <Link href="/mentions-legales">mentions légales</Link>). Créer un compte ou commander une course vaut
           acceptation de ces conditions.
@@ -31,9 +31,9 @@ export default function PageConditions() {
     >
       <Article id="article-1" titre="1. Le service">
         <p>
-          find_delivery met en relation des clients — particuliers, entreprises et boutiques — avec des livreurs, pour la
+          Avoo met en relation des clients — particuliers, entreprises et boutiques — avec des livreurs, pour la
           livraison de colis entre Libreville, Akanda et Owendo. Une course est proposée en même temps aux livreurs
-          indépendants inscrits sur find_delivery et aux livreurs de notre partenaire Ewuang : le premier livreur qui
+          indépendants inscrits sur Avoo et aux livreurs de notre partenaire Ewuang : le premier livreur qui
           l&apos;accepte l&apos;exécute.
         </p>
       </Article>
@@ -94,7 +94,7 @@ export default function PageConditions() {
           <li>
             <strong>Contre-remboursement</strong> : vous pouvez demander au livreur d&apos;encaisser auprès du destinataire,
             à la remise, le prix de votre marchandise, jusqu&apos;à {formaterMontant(PLAFOND_MARCHANDISE)} par course. Ce
-            montant vous est ensuite reversé par find_delivery, contre reçu. Il apparaît dans votre espace tant
+            montant vous est ensuite reversé par Avoo, contre reçu. Il apparaît dans votre espace tant
             qu&apos;il ne vous a pas été reversé.
           </li>
           <li>
@@ -111,7 +111,7 @@ export default function PageConditions() {
             que contre ce code : c&apos;est la preuve de la remise.
           </li>
           <li>
-            Après 5 codes faux, la course est bloquée : elle ne peut plus être clôturée que par find_delivery, après avoir
+            Après 5 codes faux, la course est bloquée : elle ne peut plus être clôturée que par Avoo, après avoir
             joint le destinataire et le livreur.
           </li>
           <li>Ne communiquez le code qu&apos;au destinataire : un colis remis contre le bon code est réputé livré.</li>
@@ -142,24 +142,24 @@ export default function PageConditions() {
       </Article>
 
       <Article id="article-9" titre="9. Livreurs indépendants">
-        <p>Les livreurs qui s&apos;inscrivent sur l&apos;application find_delivery s&apos;engagent en outre à :</p>
+        <p>Les livreurs qui s&apos;inscrivent sur l&apos;application Avoo s&apos;engagent en outre à :</p>
         <ul>
           <li>faire vérifier leur dossier au bureau, pièces en main : aucune course ne leur est proposée avant ;</li>
           <li>encaisser le montant exact indiqué à chaque étape, et ne jamais remettre un colis sans le code ;</li>
           <li>
-            verser à find_delivery les espèces encaissées pour son compte au plus tard 48 heures après chaque
+            verser à Avoo les espèces encaissées pour son compte au plus tard 48 heures après chaque
             encaissement. Au-delà de ce délai, ou dès {formaterMontant(PLAFOND_ENCOURS)} détenus, aucune nouvelle course ne
             leur est proposée jusqu&apos;au versement ;
           </li>
           <li>conserver leur position partagée pendant une course, pour son suivi.</li>
         </ul>
-        <p>Les règlements entre un livreur et find_delivery se font au bureau, contre reçu.</p>
+        <p>Les règlements entre un livreur et Avoo se font au bureau, contre reçu.</p>
       </Article>
 
       <Article id="article-10" titre="10. Responsabilité">
         <ul>
           <li>
-            find_delivery met à disposition la plateforme et veille au bon déroulement des courses. Il ne peut être tenu
+            Avoo met à disposition la plateforme et veille au bon déroulement des courses. Il ne peut être tenu
             responsable d&apos;un retard, aucun délai n&apos;étant garanti.
           </li>
           <li>
@@ -167,7 +167,7 @@ export default function PageConditions() {
             destinataire.
           </li>
           <li>
-            Toute perte ou tout dommage constaté doit être signalé à find_delivery dans les plus brefs délais, au contact
+            Toute perte ou tout dommage constaté doit être signalé à Avoo dans les plus brefs délais, au contact
             indiqué dans les <Link href="/mentions-legales">mentions légales</Link>.
           </li>
         </ul>

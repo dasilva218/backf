@@ -53,7 +53,7 @@ export function MenuAccueil({ connecte }: { connecte: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
-        <Link href="/" aria-label="find_delivery, accueil">
+        <Link href="/" aria-label="Avoo, accueil">
           <Logo />
         </Link>
 

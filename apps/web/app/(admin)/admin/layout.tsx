@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: { default: "Administration", template
 
 function Marque() {
   return (
-    <Link href="/admin" aria-label="Administration find_delivery" className="flex items-center gap-2">
+    <Link href="/admin" aria-label="Administration Avoo" className="flex items-center gap-2">
       <Logo />
       <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Admin</span>
     </Link>

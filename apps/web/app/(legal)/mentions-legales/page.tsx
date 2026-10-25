@@ -9,7 +9,7 @@ export default function PageMentionsLegales() {
   return (
     <DocumentLegal
       titre="Mentions légales"
-      intro="Informations sur l'éditeur et l'hébergeur du service find_delivery, publiées conformément à la loi n°025/2021 du 28 décembre 2021 relative aux transactions électroniques en République gabonaise."
+      intro="Informations sur l'éditeur et l'hébergeur du service Avoo, publiées conformément à la loi n°025/2021 du 28 décembre 2021 relative aux transactions électroniques en République gabonaise."
     >
       <Article id="editeur" titre="1. Éditeur">
         <ul>
@@ -54,16 +54,16 @@ export default function PageMentionsLegales() {
 
       <Article id="service" titre="4. Le service">
         <p>
-          find_delivery met en relation des clients (particuliers, entreprises, boutiques) avec des livreurs pour la
+          Avoo met en relation des clients (particuliers, entreprises, boutiques) avec des livreurs pour la
           livraison de colis à Libreville, Akanda et Owendo. Les courses sont exécutées par des livreurs indépendants
-          inscrits sur find_delivery, ou par les livreurs de son partenaire Ewuang. Les conditions du service sont
+          inscrits sur Avoo, ou par les livreurs de son partenaire Ewuang. Les conditions du service sont
           décrites dans les <Link href="/conditions-utilisation">conditions d&apos;utilisation</Link>.
         </p>
       </Article>
 
       <Article id="propriete" titre="5. Propriété intellectuelle">
         <p>
-          Le nom find_delivery, le logo, les textes et l&apos;interface du site sont la propriété de l&apos;éditeur. Toute
+          Le nom Avoo, le logo, les textes et l&apos;interface du site sont la propriété de l&apos;éditeur. Toute
           reproduction ou réutilisation sans son accord écrit est interdite.
         </p>
       </Article>

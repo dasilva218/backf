@@ -116,7 +116,7 @@ export default async function PageEspeces() {
                             compteId={id}
                             libelle="Payer le livreur"
                             titre={`Paiement à ${nom}`}
-                            description="Le bureau paie ce que find_delivery doit au livreur (un retour qui a coûté plus que la course)."
+                            description="Le bureau paie ce qu'Avoo doit au livreur (un retour qui a coûté plus que la course)."
                             maximum={-l.solde}
                           />
                         )}
@@ -189,7 +189,7 @@ export default async function PageEspeces() {
 
       <Section
         titre="Ewuang"
-        description="Ce que les livreurs Ewuang ont encaissé sur nos courses, moins ce que ces courses lui coûtent : c'est le relevé entre Ewuang et find_delivery."
+        description="Ce que les livreurs Ewuang ont encaissé sur nos courses, moins ce que ces courses lui coûtent : c'est le relevé entre Ewuang et Avoo."
         reponse={ewuang}
         action={(releve) =>
           releve.du > 0 ? (

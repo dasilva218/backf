@@ -13,7 +13,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: "find_delivery", template: "%s · find_delivery" },
+  title: { default: "Avoo", template: "%s · Avoo" },
   description: "Trouvez un livreur pour vos colis à Libreville, Akanda et Owendo.",
 };
 

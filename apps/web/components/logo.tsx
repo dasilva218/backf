@@ -7,7 +7,7 @@ export function Logo({ className }: { className?: string }) {
       <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
         <Package className="size-4" aria-hidden />
       </span>
-      find_delivery
+      Avoo
     </span>
   );
 }

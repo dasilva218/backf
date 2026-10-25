@@ -13,7 +13,7 @@ export function PiedDePage() {
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 text-sm text-muted-foreground">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <Link href="/" aria-label="find_delivery, accueil">
+          <Link href="/" aria-label="Avoo, accueil">
             <Logo className="text-foreground" />
           </Link>
           <p>Livraisons dans le Grand Libreville, Gabon</p>

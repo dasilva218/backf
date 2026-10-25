@@ -74,7 +74,7 @@ function Fiche({ course: c }: { course: CourseAdmin }) {
             <Ligne libelle="Colis" valeur={c.chargeEwuang?.colis?.description ?? "—"} />
             <Ligne
               libelle="Livreur"
-              valeur={c.livreurNom ? `${c.livreurNom} (${c.flotte === "EWUANG" ? "Ewuang" : "find_delivery"})` : "Aucun"}
+              valeur={c.livreurNom ? `${c.livreurNom} (${c.flotte === "EWUANG" ? "Ewuang" : "Avoo"})` : "Aucun"}
               detail={c.livreurContact}
             />
             {c.noteLivreur && <Ligne libelle="Note du livreur" valeur={c.noteLivreur} />}
@@ -94,7 +94,7 @@ function Fiche({ course: c }: { course: CourseAdmin }) {
             {c.montantMarchandise > 0 && <Ligne libelle="Marchandise" valeur={formaterMontant(c.montantMarchandise)} />}
             <Ligne libelle="Part du livreur" valeur={formaterMontant(c.remunerationLivreur)} />
             {c.tarifEwuang != null && <Ligne libelle="Coût chez Ewuang" valeur={formaterMontant(c.tarifEwuang)} />}
-            <Ligne libelle="Commission find_delivery" valeur={formaterMontant(c.commission)} />
+            <Ligne libelle="Commission Avoo" valeur={formaterMontant(c.commission)} />
             <Ligne libelle="Code de remise" valeur={c.codeRemise ?? "—"} detail={`${c.tentativesCode} essai(s) faux`} />
           </CardContent>
         </Card>
