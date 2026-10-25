@@ -197,6 +197,10 @@ Next 16 App Router, Tailwind v4 + primitives shadcn recopiées d'`ewuang-web` ([
 - Dates formatées avec `timeZone: 'Africa/Libreville'` ([lib/affichage.ts](apps/web/lib/affichage.ts)) ; la date souhaitée saisie (`datetime-local`) est envoyée en `+01:00`.
 - Statut affiché : `statutEwuang` fait foi dès que la course est transmise ; avant, « Non transmise » (bouton Renvoyer) ou « Annulée ».
 
+### Pages légales ([app/(legal)/](apps/web/app/(legal)/))
+
+`/conditions-utilisation`, `/confidentialite`, `/mentions-legales` : publiques (`PAGES_PUBLIQUES` dans `proxy.ts`), liées depuis le pied de page ([components/pied-de-page.tsx](apps/web/components/pied-de-page.tsx)) et l'inscription. L'identité de l'éditeur vit dans [lib/editeur.ts](apps/web/lib/editeur.ts) : une valeur `null` s'affiche « à compléter » en rouge, jamais inventée. **Les textes décrivent les règles du code** (paiement, code de remise, annulation, retour, plafonds, données du schéma Prisma) : un changement de règle ou un champ personnel ajouté se reporte dans la page concernée, avec `MISE_A_JOUR_LEGALE`.
+
 ### Espace d'administration (`/admin`, [app/(admin)/admin/](apps/web/app/(admin)/admin/))
 
 Le bureau find_delivery, dans le même site que les clients : **Livreurs** (dossiers à valider ou refuser), **Espèces** (livreurs, clients, Ewuang, règlements contre reçu, journal), **Courses** (toutes, des deux flottes ; clôture sans code d'une course de notre flotte en cours, code bloqué ou perdu : `POST /admin/courses/:id/cloturer`).

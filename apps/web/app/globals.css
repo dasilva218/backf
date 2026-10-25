@@ -34,6 +34,13 @@
   --statut-livree: oklch(0.52 0.13 155);
   --statut-alerte: oklch(0.62 0.15 65);
   --statut-annulee: oklch(0.55 0.2 27);
+
+  /* Carton des colis de la scène 3D d'accueil. */
+  --colis: oklch(0.7 0.11 65);
+
+  /* Courbes d'animation : sortie franche pour l'interface. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  interpolate-size: allow-keywords;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +71,8 @@
     --statut-livree: oklch(0.75 0.13 155);
     --statut-alerte: oklch(0.8 0.14 75);
     --statut-annulee: oklch(0.72 0.16 25);
+
+    --colis: oklch(0.76 0.11 70);
   }
 }
 
@@ -98,6 +107,7 @@
   --color-statut-livree: var(--statut-livree);
   --color-statut-alerte: var(--statut-alerte);
   --color-statut-annulee: var(--statut-annulee);
+  --color-colis: var(--colis);
 }
 
 @layer base {
@@ -107,5 +117,103 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* ─── Page d'accueil : mouvements ─────────────────────────────────────── */
+
+@keyframes entree {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(8px);
+  }
+}
+
+@keyframes revele {
+  from {
+    opacity: 0;
+    transform: translateY(32px) scale(0.98);
+  }
+}
+
+@keyframes fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes trace {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@layer components {
+  /* Apparition au chargement ; le retard se règle avec --delai. */
+  .entree {
+    animation: entree 900ms var(--ease-out) both;
+    animation-delay: var(--delai, 0ms);
+  }
+
+  /* Apparition au défilement, sans JavaScript, là où le navigateur la gère. */
+  @supports (animation-timeline: view()) {
+    .revele {
+      animation: revele linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 90%;
+    }
+
+    .trace-defilement {
+      transform-origin: left;
+      animation: trace linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 45%;
+    }
+  }
+
+  .trame-points {
+    background-image: radial-gradient(color-mix(in oklch, var(--foreground) 18%, transparent) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Texte en dégradé de marque, pour un mot clé du titre. */
+  .texte-marque {
+    background: linear-gradient(110deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--colis)));
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Ouverture fluide des questions (navigateurs récents ; ailleurs, instantanée). */
+  .question::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size 250ms var(--ease-out),
+      content-visibility 250ms allow-discrete;
+  }
+
+  .question[open]::details-content {
+    block-size: auto;
+  }
+
+  .pressable {
+    transition: transform 160ms var(--ease-out);
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .entree,
+    .revele {
+      animation: fondu 400ms ease both;
+      animation-timeline: auto;
+    }
+
+    .trace-defilement {
+      animation: none;
+    }
   }
 }

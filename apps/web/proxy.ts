@@ -12,8 +12,8 @@ const ACCUEIL: Record<string, string> = { CLIENT: "/courses", ADMIN: "/admin" };
  */
 
 const PAGES_INVITE = ["/connexion", "/inscription"];
-/** Ouvertes à tous, connecté ou non : la page d'accueil adapte son menu. */
-const PAGES_PUBLIQUES = ["/"];
+/** Ouvertes à tous, connecté ou non : la page d'accueil adapte son menu ; les pages légales se lisent sans compte. */
+const PAGES_PUBLIQUES = ["/", "/conditions-utilisation", "/confidentialite", "/mentions-legales"];
 
 export default function proxy(requete: NextRequest) {
   const chemin = requete.nextUrl.pathname;
