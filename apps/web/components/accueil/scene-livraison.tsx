@@ -42,11 +42,12 @@ import { ZONES, type Zone } from "@/lib/types";
 /**
  * Position (x, z) de chaque zone : l'ordre nord-sud est tenu, mais l'axe est
  * couché en diagonale. Aligné sur la visée de la caméra, il empilerait les
- * trois zones l'une derrière l'autre.
+ * trois zones l'une derrière l'autre. Libreville est tiré hors de la droite
+ * Akanda–Owendo : sur elle, l'arc long traverserait sa balise.
  */
 const POSITIONS: Record<Zone, readonly [number, number]> = {
   Akanda: [-2.6, -1.3],
-  Libreville: [0, 0.1],
+  Libreville: [0.2, 1.1],
   Owendo: [2.5, 1.3],
 };
 
@@ -57,7 +58,13 @@ const ROUTES: ReadonlyArray<readonly [Zone, Zone, number]> = [
   ["Akanda", "Owendo", 2.4],
 ];
 
-const COLIS_PAR_ROUTE = 2;
+/**
+ * Demi-écart entre les deux voies d'un trajet (aller, retour). Plus large que
+ * la moitié d'un colis (0,11), pour que deux colis qui se croisent ne se
+ * touchent pas.
+ */
+const ECART_VOIES = 0.14;
+const HAUT = new Vector3(0, 1, 0);
 const SEGMENTS_TUBE = 64;
 const FACES_TUBE = 8;
 const HAUTEUR_ETIQUETTE = 2;
@@ -180,30 +187,33 @@ export function SceneLivraison({ onEchec }: Props) {
     const matColis = new MeshStandardMaterial({ roughness: 0.55 });
     const geoColis = new BoxGeometry(0.22, 0.16, 0.22);
 
-    const routes = ROUTES.map(([a, b, hauteur]) => {
+    /**
+     * Une voie par sens, chacune décalée sur sa droite : l'aller et le retour
+     * d'un même trajet ne partagent jamais la même courbe.
+     */
+    const voie = (a: Zone, b: Zone, hauteur: number) => {
       const depart = positionZone(a, 0.32);
       const arrivee = positionZone(b, 0.32);
+      const droite = arrivee.clone().sub(depart).cross(HAUT).normalize().multiplyScalar(ECART_VOIES);
+      depart.add(droite);
+      arrivee.add(droite);
       const sommet = depart.clone().lerp(arrivee, 0.5);
       sommet.y += hauteur;
       const courbe = new QuadraticBezierCurve3(depart, sommet, arrivee);
       const geo = new TubeGeometry(courbe, SEGMENTS_TUBE, 0.018, FACES_TUBE, false);
       scene.add(new Mesh(geo, matRoute));
       return { courbe, geo, total: geo.index?.count ?? 0 };
-    });
+    };
 
-    const colis = routes.flatMap(({ courbe }, r) =>
-      Array.from({ length: COLIS_PAR_ROUTE }, (_, i) => {
-        const mesh = new Mesh(geoColis, matColis);
-        scene.add(mesh);
-        return {
-          mesh,
-          courbe,
-          decalage: i / COLIS_PAR_ROUTE + r * 0.17,
-          sens: i % 2 === 0 ? 1 : -1,
-          vitesse: 0.09 + r * 0.015,
-        };
-      }),
-    );
+    const voies = ROUTES.flatMap(([a, b, hauteur]) => [voie(a, b, hauteur), voie(b, a, hauteur)]);
+
+    // Un colis par voie, toujours dans le sens de sa voie : deux colis d'une
+    // même voie iraient à la même vitesse et ne se rattraperaient jamais.
+    const colis = voies.map(({ courbe }, v) => {
+      const mesh = new Mesh(geoColis, matColis);
+      scene.add(mesh);
+      return { mesh, courbe, decalage: (v % 2) * 0.5 + v * 0.085, vitesse: 0.09 + Math.floor(v / 2) * 0.015 };
+    });
 
     // ─── Couleurs du thème ───────────────────────────────────────────────
     const appliquerCouleurs = () => {
@@ -252,16 +262,15 @@ export function SceneLivraison({ onEchec }: Props) {
 
       const traces = adoucir((temps - 0.6) / 1.2);
       const anneau = FACES_TUBE * 6;
-      routes.forEach(({ geo, total }) => {
+      voies.forEach(({ geo, total }) => {
         geo.setDrawRange(0, Math.floor((total * traces) / anneau) * anneau);
       });
 
-      colis.forEach(({ mesh, courbe, decalage, sens, vitesse }) => {
+      colis.forEach(({ mesh, courbe, decalage, vitesse }) => {
         const t = (temps * vitesse + decalage) % 1;
-        const u = sens > 0 ? t : 1 - t;
-        courbe.getPointAt(u, mesh.position);
+        courbe.getPointAt(t, mesh.position);
         mesh.position.y += 0.1;
-        courbe.getTangentAt(u, tangente).multiplyScalar(sens);
+        courbe.getTangentAt(t, tangente);
         mesh.lookAt(tangente.add(mesh.position));
         // Le colis grossit en quittant une zone et rétrécit en y arrivant.
         mesh.scale.setScalar(Math.max(0.001, Math.min(1, t * 8, (1 - t) * 8) * traces));
