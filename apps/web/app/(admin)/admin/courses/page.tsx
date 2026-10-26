@@ -98,8 +98,8 @@ function Liste({ donnees }: { donnees: PageAdmin }) {
                       <Link href={`/admin/courses/${c.id}`} className="font-medium hover:text-primary hover:underline">
                         {trajet}
                       </Link>
-                      <span className="max-w-48 truncate text-xs text-muted-foreground" title={c.referenceExterne ?? c.id}>
-                        {c.referenceExterne ?? c.id}
+                      <span className="text-xs text-muted-foreground" title={c.referenceExterne ?? undefined}>
+                        {c.numero}
                       </span>
                     </div>
                   </TableCell>

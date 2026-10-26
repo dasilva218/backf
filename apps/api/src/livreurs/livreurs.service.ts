@@ -47,7 +47,7 @@ export class LivreursService {
         const livreur = await this.exigerProfil(userId);
         if (livreur.statutDossier === StatutDossier.EN_ATTENTE) {
             throw new ForbiddenException(
-                "Votre dossier n'est pas encore validé. Passez au bureau find_delivery avec vos pièces.",
+                "Votre dossier n'est pas encore validé. Passez au bureau Avoo avec vos pièces.",
             );
         }
         if (livreur.statutDossier === StatutDossier.REFUSE) {

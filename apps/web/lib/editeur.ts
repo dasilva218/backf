@@ -31,4 +31,4 @@ export const EDITEUR = {
 };
 
 /** Date de la version en ligne des documents légaux, à changer à chaque modification. */
-export const MISE_A_JOUR_LEGALE = "24 octobre 2026";
+export const MISE_A_JOUR_LEGALE = "26 octobre 2026";

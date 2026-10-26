@@ -57,8 +57,9 @@ function Fiche({ course: c }: { course: CourseAdmin }) {
         <BadgeStatut livraison={c} />
       </div>
       <p className="-mt-4 text-sm text-muted-foreground">
-        {c.referenceExterne ?? c.id} · {c.typeCourse ? LIBELLES_TYPE[c.typeCourse] : "—"} · demandée le{" "}
+        {c.numero} · {c.typeCourse ? LIBELLES_TYPE[c.typeCourse] : "—"} · demandée le{" "}
         {formaterDate(c.dateDemande)}
+        {c.referenceExterne && <span className="block text-xs">Réf. Ewuang : {c.referenceExterne}</span>}
       </p>
 
       {cloturable && <ClotureCourse id={c.id} du={aRemise} essais={c.tentativesCode} />}

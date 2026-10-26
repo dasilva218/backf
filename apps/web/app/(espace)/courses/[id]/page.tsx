@@ -10,12 +10,14 @@ import {
   calculerEncaissements,
   estAnnulable,
   estARenvoyer,
+  estSuivable,
   formaterDate,
   formaterMontant,
   LIBELLES_TYPE,
 } from "@/lib/affichage";
 import type { LivraisonDetail } from "@/lib/types";
 import { ActionsCourse } from "./actions";
+import { SuiviLivreur } from "./suivi-livreur";
 
 export const metadata: Metadata = { title: "Course" };
 
@@ -131,6 +133,8 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
         </Card>
       )}
 
+      {estSuivable(course) && <SuiviLivreur id={course.id} livreurNom={course.livreurNom} />}
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -238,7 +242,9 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">Référence : {course.referenceExterne ?? course.id}</p>
+      <p className="text-xs text-muted-foreground">
+        Numéro de course : <span className="font-medium text-foreground">{course.numero}</span>
+      </p>
     </div>
   );
 }

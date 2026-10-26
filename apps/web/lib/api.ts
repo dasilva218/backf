@@ -1,7 +1,9 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { exigerSession } from "@/lib/session";
+import { NOM_COOKIE_SESSION, jetonExpire, lireChargeJeton } from "@/lib/jeton";
+import { exigerSession, type RoleEspace } from "@/lib/session";
 
 /**
  * Client de l'API find_delivery, côté serveur uniquement.
@@ -95,4 +97,20 @@ export async function appelerApi<T>(
   const resultat = await appeler<T>(chemin, { ...init, jeton });
   if (!resultat.ok && resultat.statut === 401) redirect("/deconnexion?motif=expiree");
   return resultat;
+}
+
+/**
+ * Appel depuis un Route Handler que le navigateur interroge (suivi en direct).
+ *
+ * Sans redirection : `redirect()` répondrait au `fetch` du navigateur par une
+ * page HTML. Une session absente, expirée ou d'un autre rôle rend un 401, et
+ * c'est l'écran qui mène alors à `/deconnexion`.
+ */
+export async function appelerApiPourRoute<T>(chemin: string, role: RoleEspace): Promise<ReponseApi<T>> {
+  const jeton = (await cookies()).get(NOM_COOKIE_SESSION)?.value;
+  const charge = lireChargeJeton(jeton);
+  if (!jeton || !charge || jetonExpire(charge) || charge.role !== role) {
+    return { ok: false, statut: 401, message: "Session expirée" };
+  }
+  return appeler<T>(chemin, { jeton });
 }

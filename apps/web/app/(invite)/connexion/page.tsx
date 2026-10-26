@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: "Connexion" };
 const MESSAGES_MOTIF: Record<string, string> = {
   expiree: "Votre session a expiré. Reconnectez-vous.",
   role: "Cet espace est réservé aux comptes client.",
+  reinitialise: "Mot de passe modifié. Connectez-vous avec le nouveau.",
 };
 
 export default async function PageConnexion({
@@ -31,6 +32,11 @@ export default async function PageConnexion({
           </p>
         )}
         <FormulaireConnexion />
+        <p className="-mt-3 text-center text-sm">
+          <Link href="/mot-de-passe-oublie" className="font-medium text-primary underline-offset-4 hover:underline">
+            Mot de passe oublié ?
+          </Link>
+        </p>
         <p className="text-center text-sm text-muted-foreground">
           Pas encore de compte ?{" "}
           <Link href="/inscription" className="font-medium text-primary underline-offset-4 hover:underline">

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Banknote, Package, UsersRound } from "lucide-react";
+import { Banknote, MapIcon, Package, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LIENS = [
   { href: "/admin/livreurs", libelle: "Livreurs", icone: UsersRound },
   { href: "/admin/especes", libelle: "Espèces", icone: Banknote },
   { href: "/admin/courses", libelle: "Courses", icone: Package },
+  { href: "/admin/carte", libelle: "Carte", icone: MapIcon },
 ];
 
 /** Colonne dans la barre latérale (md et plus), ligne défilante en haut sur mobile. */

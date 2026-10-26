@@ -85,10 +85,12 @@ export default function PageConfidentialite() {
           <li>
             <strong>Ewuang, notre partenaire de livraison</strong> : chaque course lui est transmise pour être proposée à
             ses livreurs, avec les mêmes informations. Ewuang nous renvoie le nom, le téléphone et le véhicule de son
-            livreur, que nous vous affichons. Ewuang traite ces données selon sa propre politique de confidentialité.
+            livreur, que nous vous affichons, et sa position pendant la course. Ewuang traite ces données selon sa propre politique de confidentialité.
           </li>
           <li>
-            <strong>Vous</strong> voyez le nom, le téléphone et le véhicule du livreur dès qu&apos;il accepte votre course.
+            <strong>Vous</strong> voyez le nom, le téléphone et le véhicule du livreur dès qu&apos;il accepte votre course,
+            et sa position sur une carte tant qu&apos;il a votre colis en main. Elle n&apos;est plus montrée une fois le
+            colis remis ou rendu.
           </li>
           <li>
             <strong>L&apos;équipe Avoo</strong>, pour le suivi des courses, la vérification des dossiers et les
@@ -98,6 +100,11 @@ export default function PageConfidentialite() {
             <strong>Nos hébergeurs</strong> (voir les <Link href="/mentions-legales">mentions légales</Link>), qui
             stockent les données pour notre compte.
           </li>
+          <li>
+            <strong>Resend</strong>, notre service d&apos;envoi d&apos;e-mails : quand vous demandez à réinitialiser
+            votre mot de passe, il reçoit votre adresse e-mail et le lien de réinitialisation, pour le seul besoin de
+            l&apos;envoi.
+          </li>
         </ul>
       </Article>
 
@@ -106,6 +113,10 @@ export default function PageConfidentialite() {
           La base de données d&apos;Avoo est hébergée par Neon sur l&apos;infrastructure d&apos;Amazon Web Services,
           aux États-Unis (région us-east-2). Vos données y sont donc transférées hors du Gabon, pour le seul besoin de
           leur stockage.
+        </p>
+        <p>
+          Les e-mails de réinitialisation du mot de passe sont envoyés par Resend, aux États-Unis : votre adresse
+          e-mail y est transférée au moment de l&apos;envoi.
         </p>
       </Article>
 

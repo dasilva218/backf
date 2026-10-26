@@ -63,6 +63,9 @@ export type Flotte = "FIND_DELIVERY" | "EWUANG";
 
 export interface Livraison {
   id: string;
+  /** Numéro court « AV-10427 » : celui qu'on affiche et qu'on dicte. */
+  numero: string;
+  /** Clé technique envoyée à Ewuang (FD-<uuid>) : pas pour l'affichage client. */
   referenceExterne: string | null;
   missionEwuangId: string | null;
   /** Fait foi quand la flotte find_delivery a la course. */
@@ -215,6 +218,7 @@ export interface ReleveEwuang {
 /** Étape d'une course Ewuang dont l'encaissement au registre diffère de l'attendu (`GET /admin/especes/ewuang/ecarts`). */
 export interface EcartEwuang {
   livraisonId: string;
+  numero: string;
   referenceExterne: string | null;
   statutEwuang: string | null;
   livreurNom: string | null;
@@ -222,6 +226,55 @@ export interface EcartEwuang {
   attendu: number;
   inscrit: number;
   faitAt: string;
+}
+
+// ─── Suivi en direct (apps/api/src/suivi) ───────────────────────────────────
+
+/** Position d'un livreur ; `perimee` au-delà de 5 min sans nouvelle position. */
+export interface PositionVue {
+  latitude: number;
+  longitude: number;
+  positionAt: string;
+  perimee: boolean;
+  precisionM: number | null;
+}
+
+/** `GET /livraisons/:id/suivi`. */
+export interface SuiviCourse {
+  /** Un livreur a le colis en main : sinon, rien à suivre. */
+  enCours: boolean;
+  flotte: Flotte | null;
+  position: PositionVue | null;
+  /** Trajet depuis l'acceptation, du plus ancien au plus récent (flotte Avoo seulement). */
+  trace: { latitude: number; longitude: number; at: string }[];
+  /** Ewuang n'a pas pu être lu : la position manque, pas la course. */
+  flotteIndisponible: boolean;
+}
+
+/** Une course en main sur la carte ADMIN (`GET /admin/carte`). */
+export interface CourseCarte {
+  id: string;
+  referenceExterne: string | null;
+  missionEwuangId: string | null;
+  flotte: Flotte | null;
+  statut: StatutLivraison;
+  statutEwuang: string | null;
+  zoneDepart: Zone | null;
+  zoneArrivee: Zone | null;
+  adresseDepart: string;
+  adresseArrivee: string;
+  destinataireNom: string | null;
+  livreurNom: string | null;
+  livreurContact: string | null;
+  livreurTypeVehicule: string | null;
+  dateAcceptation: string | null;
+  position: PositionVue | null;
+}
+
+export interface CarteAdmin {
+  genereAt: string;
+  flotteEwuangIndisponible: boolean;
+  courses: CourseCarte[];
 }
 
 export interface ResultatTransmission {

@@ -13,14 +13,28 @@ import { TarifsModule } from './tarifs/tarifs.module.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { LivraisonsModule } from './livraisons/livraisons.module.js';
 import { LivreursModule } from './livreurs/livreurs.module.js';
+import { SuiviModule } from './suivi/suivi.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]), UsersModule, PrismaModule, AuthModule, EwuangModule, TarifsModule, ClientsModule, LivraisonsModule, LivreursModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
+    UsersModule,
+    PrismaModule,
+    AuthModule,
+    EwuangModule,
+    TarifsModule,
+    ClientsModule,
+    LivraisonsModule,
+    LivreursModule,
+    SuiviModule,
+  ],
   controllers: [],
   providers: [
     // L'ordre compte : le limiteur compte par compte, il a besoin de `req.user`.
-    { provide: APP_GUARD, useClass: JwtAuthGuard },            // 1. authentifie
+    { provide: APP_GUARD, useClass: JwtAuthGuard }, // 1. authentifie
     { provide: APP_GUARD, useClass: ThrottlerParCompteGuard }, // 2. limite le débit
-    { provide: APP_GUARD, useClass: RolesGuard },]             // 3. vérifie le rôle
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ], // 3. vérifie le rôle
 })
-export class AppModule { }
+export class AppModule {}

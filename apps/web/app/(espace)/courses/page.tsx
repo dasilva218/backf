@@ -133,7 +133,9 @@ function ListeCourses({ donnees }: { donnees: PageLivraisons }) {
                 <p className="truncate text-sm text-muted-foreground">
                   Pour {course.destinataireNom ?? "—"} · {course.adresseArrivee}
                 </p>
-                <p className="text-xs text-muted-foreground">{formaterDate(course.dateDemande)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {course.numero} · {formaterDate(course.dateDemande)}
+                </p>
               </div>
               <div className="flex items-center justify-between gap-4 sm:justify-end">
                 <BadgeStatut livraison={course} />

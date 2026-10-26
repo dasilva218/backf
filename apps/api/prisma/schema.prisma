@@ -162,6 +162,11 @@ model Livraison {
   referenceExterne String? @unique
   missionEwuangId  String? @unique
 
+  /// Numéro court « AV-10427 », posé par la base (séquence) : c'est lui qu'on
+  /// affiche et qu'on dicte au téléphone. Ne remplace pas `referenceExterne`,
+  /// qui reste la clé d'idempotence d'Ewuang (migration numero_court).
+  numero String @unique @default(dbgenerated("('AV-'::text || nextval('\"Livraison_numero_seq\"'::regclass))"))
+
   /// Statut d'Ewuang, repris TEL QUEL : « En attente », « En cours de
   /// livraison », « Colis récupéré », « Livrée », « Annulée », « Reportée ».
   ///

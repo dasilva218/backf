@@ -318,7 +318,7 @@ function EcartsEwuang({ reponse }: { reponse: ReponseApi<EcartEwuang[]> }) {
                 <TableRow key={`${e.livraisonId}:${e.etape}`}>
                   <TableCell className="whitespace-nowrap">
                     <Link href={`/admin/courses/${e.livraisonId}`} className="font-medium hover:text-primary hover:underline">
-                      {e.referenceExterne ?? e.livraisonId}
+                      {e.numero}
                     </Link>
                     {e.statutEwuang && <span className="block text-xs text-muted-foreground">{e.statutEwuang}</span>}
                   </TableCell>

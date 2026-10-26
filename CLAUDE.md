@@ -71,6 +71,8 @@ Ils s'appliquent dans cet ordre à **toutes** les routes :
 
 `JwtStrategy.validate` relit l'utilisateur en base (sans `password`) et le place dans `req.user`, lu par `@CurrentUser()`. Mots de passe hachés en bcrypt. Le login refuse un compte dont `status !== 'ACTIVE'`.
 
+**Mot de passe oublié** (ajouté le 2026-10-26) : `POST /auth/mot-de-passe/oubli` répond toujours 200 sans attendre l'envoi (ni le contenu ni la durée ne disent si le compte existe), limité à 3 par quart d'heure **par e-mail** (`ThrottlerParCompteGuard`). Le lien `<WEB_URL>/reinitialiser-mot-de-passe?jeton=…` porte un JWT de 30 min signé avec `JWT_SECRET` + **le hash actuel du mot de passe** : aucune table, et le lien meurt dès que le mot de passe change (usage unique, `remplacerMotDePasse` conditionné par l'ancien hash contre la course). Envoi par l'API REST de Resend ([email.service.ts](apps/api/src/auth/email.service.ts)) : `RESEND_API_KEY`, `EMAIL_EXPEDITEUR` (domaine vérifié), `WEB_URL`. Sans clé, rien ne part ; en dev le lien est écrit dans les logs. Les sessions déjà ouvertes restent valides jusqu'à expiration. Côté web, tout champ mot de passe passe par [ChampMotDePasse](apps/web/components/champ-mot-de-passe.tsx) (bouton afficher/masquer).
+
 Rôles : `CLIENT | LIVREUR | ADMIN` (`BOUTIQUE` renommé en `CLIENT` le 2026-10-23). Profil métier 1-1 par rôle : `Admin`, `Client`, `Livreur`. Un `Client` porte un `type` (`PARTICULIER | ENTREPRISE | BOUTIQUE`) et une `raisonSociale`, obligatoire hors particulier (contrôlée par le DTO).
 
 ### Base de données
@@ -110,6 +112,7 @@ Prix **par zone d'arrivée** (`PRIX_STANDARD[arrivée]`), plus un supplément se
 - **Paiement en espèces** : `POST /livraisons` exige `paiement.payeur` (`expediteur` | `destinataire`) et accepte `paiement.montant_marchandise` (contre-remboursement, payé par le destinataire à la remise, 50 000 au plus : `PLAFOND_MARCHANDISE`). Stockés dans `Livraison.payeur` / `montantMarchandise`. `payeur = null` = course réglée hors course (créée avant le 2026-10-23). **Pas encore transmis à Ewuang** (v1 du contrat) : à ajouter à `chargeEwuang` avec la v2.
 - `@ValidateNested` seul laisse passer un bloc **absent** : un bloc obligatoire porte aussi `@IsDefined`, sinon la requête atteint le service et lève une 500. `destinataire` et `colis` n'en ont pas encore.
 - `POST /livraisons` (CLIENT) : prix = grille, zone d'arrivée + type. **La course est écrite avant l'appel à Ewuang**, avec `referenceExterne = FD-<uuid>` et le corps exact envoyé dans `chargeEwuang`. Issue : 201 transmise ; **202** Ewuang injoignable (`transmise: false`, motif dans `erreurEwuang`) ; 400 refus définitif d'Ewuang → course passée `ANNULEE`.
+- **Numéro court `Livraison.numero`** (`AV-10427`, ajouté le 2026-10-26) : posé par la base (séquence `Livraison_numero_seq`), c'est le seul identifiant affiché au client, au livreur (`reference`, `referenceCourse`) et dicté au téléphone. `referenceExterne` (FD-<uuid>) n'est montrée qu'à l'ADMIN (« Réf. Ewuang ») : ne jamais la remplacer par le numéro, une séquence remise à zéro réémettrait une clé d'idempotence déjà connue d'Ewuang.
 - `POST /livraisons/:id/renvoyer` rejoue `chargeEwuang` **tel quel** : Ewuang n'est idempotent qu'à corps identique (sinon 409). Ne jamais reconstruire le corps depuis les colonnes ou le profil.
 - Zone envoyée à Ewuang = **`zone_arrivee`** (chez lui, `zone` est la ville de destination). `zoneDepart`/`zoneArrivee`/`typeCourse` restent chez nous (le départ pour l'affichage seulement).
 - À la transmission, `tarifEwuang` = `remuneration_livreur` renvoyée par Ewuang et `commission` = `tarif client − tarifEwuang`. `statutEwuang` n'est posé que s'il est encore null (un webhook peut arriver avant la réponse).
@@ -130,6 +133,17 @@ L'API de [../find_delivery_mobile](../find_delivery_mobile/). Choix et limites :
 - **Dossier** : `Livreur.statutDossier`, validé par un ADMIN (`/admin/livreurs`). Aucune course avant `VALIDE` (`LivreursService.exigerValide`). Pas de dépôt de pièces.
 - Une course disponible est servie **sans contacts** ; le code de remise n'est jamais servi au livreur.
 - `Livreur.moyenTransport` est l'enum d'origine : seuls `MOTO`, `VOITURE`, `CANTER` (= camionnette) sont utilisés ([vehicules.ts](apps/api/src/livreurs/vehicules.ts)). La création de course ne propose plus `camionnette`, mais l'inscription l'accepte.
+
+## Suivi en direct ([src/suivi/](apps/api/src/suivi/))
+
+Position du livreur qui a le colis en main, pour la fiche client (`/courses/[id]`) et la carte ADMIN (`/admin/carte`). Ajouté le 2026-10-25.
+
+- `GET /livraisons/:id/suivi` (CLIENT : ses courses, 404 sinon ; ADMIN) et `GET /admin/carte` (ADMIN, 200 courses au plus). Rien n'est servi hors course en main (`COURSE_EN_COURS` / `estEnCours`, miroir web `estSuivable` dans `lib/affichage.ts`) : ni avant l'attribution, ni après la remise ou le retour.
+- Deux sources : notre flotte → dernière `SuiviPosition` (et la trace depuis `dateAcceptation`) ; Ewuang → `GET /partenaires/flotte`, **une lecture partagée par fenêtre de 15 s** pour tous les écrans (cache en mémoire dans `SuiviService`, échec compris), jamais stockée. Ewuang illisible → positions nulles et `flotteIndisponible`, jamais une erreur de la route.
+- Position de plus de 5 min → `perimee` (contrat §5), affichée estompée comme « dernière position connue ».
+- `enregistrerPosition` pose `timestamp` explicitement : la colonne est un `TIMESTAMP(3)` sans fuseau dont le `DEFAULT CURRENT_TIMESTAMP` suit le fuseau de la session.
+- Web : le navigateur interroge toutes les 15 s des Route Handlers (`/courses/[id]/suivi`, `/admin/carte/donnees`) qui relaient l'API via `appelerApiPourRoute` (sans `redirect()` : 401 → l'écran mène à `/deconnexion`). Ils vivent sous `/courses` et `/admin` parce que `proxy.ts` renvoie chaque rôle hors de son espace. Carte : react-leaflet chargé en `dynamic(ssr: false)`, tuiles **OSM France** (`tile.openstreetmap.org` est injoignable depuis certains réseaux gabonais).
+- Pas de temps réel « poussé » : la position bouge au rythme de l'envoi (30 s, application ouverte, côté find_delivery_mobile ; ce qu'Ewuang sert, côté Ewuang).
 
 ## Registre des espèces ([src/especes/](apps/api/src/especes/))
 

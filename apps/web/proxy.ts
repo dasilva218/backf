@@ -11,9 +11,18 @@ const ACCUEIL: Record<string, string> = { CLIENT: "/courses", ADMIN: "/admin" };
  * pages repassent en plus par `exigerSession()`.
  */
 
-const PAGES_INVITE = ["/connexion", "/inscription"];
-/** Ouvertes à tous, connecté ou non : la page d'accueil adapte son menu ; les pages légales se lisent sans compte. */
-const PAGES_PUBLIQUES = ["/", "/conditions-utilisation", "/confidentialite", "/mentions-legales"];
+const PAGES_INVITE = ["/connexion", "/inscription", "/mot-de-passe-oublie"];
+/**
+ * Ouvertes à tous, connecté ou non : la page d'accueil adapte son menu ; les pages légales se lisent sans compte ;
+ * le lien de réinitialisation reçu par e-mail doit s'ouvrir même si une session traîne sur ce navigateur.
+ */
+const PAGES_PUBLIQUES = [
+  "/",
+  "/conditions-utilisation",
+  "/confidentialite",
+  "/mentions-legales",
+  "/reinitialiser-mot-de-passe",
+];
 
 export default function proxy(requete: NextRequest) {
   const chemin = requete.nextUrl.pathname;

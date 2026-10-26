@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { sInscrire } from "@/app/actions/auth";
+import { ChampMotDePasse } from "@/components/champ-mot-de-passe";
 import { OverlayChargement } from "@/components/overlay-chargement";
 import { useFormulaireAction } from "@/components/use-retour-action";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,9 @@ export function FormulaireInscription() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Mot de passe</Label>
-        <Input
+        <ChampMotDePasse
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={10}
           maxLength={72}
@@ -36,10 +36,9 @@ export function FormulaireInscription() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="confirmation">Confirmer le mot de passe</Label>
-        <Input
+        <ChampMotDePasse
           id="confirmation"
           name="confirmation"
-          type="password"
           autoComplete="new-password"
           minLength={10}
           maxLength={72}

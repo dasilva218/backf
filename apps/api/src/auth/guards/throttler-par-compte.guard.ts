@@ -17,15 +17,30 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  */
 @Injectable()
 export class ThrottlerParCompteGuard extends ThrottlerGuard {
-    protected override async getTracker(req: Record<string, any>): Promise<string> {
-        const userId = (req.user as { id?: unknown } | undefined)?.id;
-        if (typeof userId === 'string') return `compte:${userId}`;
+  protected override async getTracker(
+    req: Record<string, any>,
+  ): Promise<string> {
+    const userId = (req.user as { id?: unknown } | undefined)?.id;
+    if (typeof userId === 'string') return `compte:${userId}`;
 
-        const email = (req.body as { email?: unknown } | undefined)?.email;
-        if (typeof req.path === 'string' && req.path.endsWith('/auth/login') && typeof email === 'string') {
-            return `login:${email.trim().toLowerCase()}`;
-        }
-
-        return super.getTracker(req);
+    const email = (req.body as { email?: unknown } | undefined)?.email;
+    if (
+      typeof req.path === 'string' &&
+      req.path.endsWith('/auth/login') &&
+      typeof email === 'string'
+    ) {
+      return `login:${email.trim().toLowerCase()}`;
     }
+    // Mot de passe oublié : par e-mail visé, sinon tout le site (une seule
+    // IP, celle du serveur Next) partagerait 3 demandes par quart d'heure.
+    if (
+      typeof req.path === 'string' &&
+      req.path.endsWith('/auth/mot-de-passe/oubli') &&
+      typeof email === 'string'
+    ) {
+      return `oubli:${email.trim().toLowerCase()}`;
+    }
+
+    return super.getTracker(req);
+  }
 }

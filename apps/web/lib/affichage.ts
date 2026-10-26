@@ -145,6 +145,20 @@ export function estAnnulable(livraison: Pick<Livraison, "statut" | "statutEwuang
   );
 }
 
+/**
+ * Un livreur a le colis en main : la fiche affiche sa position en direct.
+ * Miroir de `estEnCours` (apps/api/src/suivi/suivi.ts), qui seul fait foi.
+ */
+export function estSuivable(livraison: Pick<Livraison, "statut" | "statutEwuang" | "flotte">): boolean {
+  if (livraison.flotte === "FIND_DELIVERY") {
+    return ["ACCEPTEE", "EN_COURS", "RETOUR_EXPEDITEUR"].includes(livraison.statut);
+  }
+  if (livraison.flotte === "EWUANG") {
+    return ["En cours de livraison", "Colis récupéré", "Retour expéditeur"].includes(livraison.statutEwuang ?? "");
+  }
+  return false;
+}
+
 export function estARenvoyer(livraison: Pick<Livraison, "statut" | "missionEwuangId">): boolean {
   return !livraison.missionEwuangId && livraison.statut !== "ANNULEE";
 }

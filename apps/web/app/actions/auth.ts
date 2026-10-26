@@ -77,6 +77,49 @@ export async function sInscrire(_etat: EtatAction, formData: FormData): Promise<
   redirect("/profil?bienvenue=1");
 }
 
+export async function demanderReinitialisation(_etat: EtatAction, formData: FormData): Promise<EtatAction> {
+  const email = texte(formData, "email").toLowerCase();
+  if (!email) {
+    return { ok: false, message: "Saisissez l'e-mail de votre compte." };
+  }
+
+  // L'API répond pareil que le compte existe ou non : rien à distinguer ici.
+  const reponse = await appelerApiPublique<{ message: string }>("/auth/mot-de-passe/oubli", "POST", { email });
+  if (!reponse.ok) {
+    return { ok: false, message: reponse.message };
+  }
+  return { ok: true, message: reponse.donnees.message };
+}
+
+export async function reinitialiserMotDePasse(_etat: EtatAction, formData: FormData): Promise<EtatAction> {
+  const jeton = texte(formData, "jeton");
+  const password = formData.get("password");
+  const confirmation = formData.get("confirmation");
+
+  if (!jeton) {
+    return { ok: false, message: "Lien de réinitialisation incomplet. Ouvrez à nouveau le lien reçu par e-mail." };
+  }
+  if (typeof password !== "string" || password.length < 10) {
+    return { ok: false, message: "Le mot de passe doit contenir au moins 10 caractères." };
+  }
+  if (password.length > 72) {
+    return { ok: false, message: "Le mot de passe ne doit pas dépasser 72 caractères." };
+  }
+  if (password !== confirmation) {
+    return { ok: false, message: "Les deux mots de passe ne correspondent pas." };
+  }
+
+  const reponse = await appelerApiPublique("/auth/mot-de-passe/reinitialiser", "POST", { jeton, password });
+  if (!reponse.ok) {
+    return { ok: false, message: reponse.message };
+  }
+
+  // Une éventuelle session ouverte sur ce navigateur appartenait peut-être à
+  // quelqu'un d'autre : on repart d'une connexion propre.
+  await fermerSession();
+  redirect("/connexion?motif=reinitialise");
+}
+
 export async function seDeconnecter(): Promise<void> {
   await fermerSession();
   redirect("/connexion");

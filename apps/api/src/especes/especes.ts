@@ -75,9 +75,9 @@ export function etatLivreur(soldeLivreur: number, depuis: Date | null, maintenan
     const echeance = soldeLivreur > 0 && depuis ? new Date(depuis.getTime() + DELAI_VERSEMENT_MS) : null;
     let blocage: string | null = null;
     if (soldeLivreur >= PLAFOND_ENCOURS) {
-        blocage = `Vous détenez ${fcfa(soldeLivreur)} : au-delà de ${fcfa(PLAFOND_ENCOURS)}, versez-les à find_delivery avant de prendre une nouvelle course.`;
+        blocage = `Vous détenez ${fcfa(soldeLivreur)} : au-delà de ${fcfa(PLAFOND_ENCOURS)}, versez-les à Avoo avant de prendre une nouvelle course.`;
     } else if (echeance && echeance.getTime() <= maintenant.getTime()) {
-        blocage = `Versement en retard : ${fcfa(soldeLivreur)} sont à verser à find_delivery depuis plus de 48 h. Versez-les pour reprendre des courses.`;
+        blocage = `Versement en retard : ${fcfa(soldeLivreur)} sont à verser à Avoo depuis plus de 48 h. Versez-les pour reprendre des courses.`;
     }
     return { solde: soldeLivreur, plafond: PLAFOND_ENCOURS, depuis: echeance ? depuis : null, echeance, blocage };
 }
