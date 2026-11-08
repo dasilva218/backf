@@ -9,7 +9,7 @@ import { Prisma, UserRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * fonction qui recupère tout les utilisateurs
@@ -62,30 +62,6 @@ export class UsersService {
     return await this.prisma.user.findUnique({ where: { id } });
   }
 
-<<<<<<< HEAD
-    /**
-     * fonction qui crée un utilisateur selon le rôle
-     * @param data 
-     * @return 
-     */
-    async create(data: Prisma.UserCreateInput) {
-        try {
-            return await this.prisma.user.create(
-                {
-                    data: { ...data },
-                    omit: { password: true }
-                }
-            )
-        } catch (error) {
-            // P2002 = violation de la contrainte d'unicité (email déjà pris)
-            if (
-                error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
-            ) {
-                throw new ConflictException('Cet email est déjà utilisé');
-            }
-            throw error;
-        }
-=======
   /**
    * Remplace le mot de passe seulement s'il n'a pas changé depuis la lecture
    * (`ancienHash`) : deux requêtes simultanées avec le même lien de
@@ -123,7 +99,6 @@ export class UsersService {
         throw new ConflictException('Cet email est déjà utilisé');
       }
       throw error;
->>>>>>> 84c9ba72373001864a255debb1a89927db968d0a
     }
   }
 }

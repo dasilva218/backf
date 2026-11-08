@@ -14,6 +14,9 @@ import { ClientsModule } from './clients/clients.module.js';
 import { LivraisonsModule } from './livraisons/livraisons.module.js';
 import { LivreursModule } from './livreurs/livreurs.module.js';
 import { SuiviModule } from './suivi/suivi.module.js';
+import { HomeModule } from './home/home.module.js';
+
+
 
 @Module({
   imports: [
@@ -28,6 +31,7 @@ import { SuiviModule } from './suivi/suivi.module.js';
     LivraisonsModule,
     LivreursModule,
     SuiviModule,
+    HomeModule,
   ],
   controllers: [],
   providers: [
@@ -37,4 +41,4 @@ import { SuiviModule } from './suivi/suivi.module.js';
     { provide: APP_GUARD, useClass: RolesGuard },
   ], // 3. vérifie le rôle
 })
-export class AppModule {}
+export class AppModule { }
