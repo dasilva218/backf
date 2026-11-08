@@ -8,7 +8,7 @@ export default function CourseIntrouvable() {
       <CardContent className="flex flex-col items-start gap-3">
         <p className="font-medium">Course introuvable</p>
         <p className="text-sm text-muted-foreground">
-          Elle n&apos;existe pas, ou n&apos;appartient pas à votre boutique.
+          Elle n&apos;existe pas, ou n&apos;appartient pas à votre compte.
         </p>
         <Button asChild variant="outline" size="sm">
           <Link href="/courses">Retour à mes courses</Link>

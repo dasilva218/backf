@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { appelerApi } from "@/lib/api";
 import {
+  PAYEURS,
+  PLAFOND_MARCHANDISE,
   TYPES_COURSE,
   VEHICULES,
   ZONES,
@@ -40,6 +42,23 @@ export async function creerCourse(_etat: EtatAction, formData: FormData): Promis
     return { ok: false, message: "Choisissez un type de course." };
   }
 
+  const payeur = texte(formData, "payeur");
+  if (!parmi(PAYEURS, payeur)) {
+    return { ok: false, message: "Indiquez qui paie la course : l'expéditeur ou le destinataire." };
+  }
+  // Champ vide = pas de marchandise à encaisser.
+  const saisieMarchandise = texte(formData, "montant_marchandise").replace(/\s/g, "");
+  const montantMarchandise = saisieMarchandise === "" ? 0 : Number(saisieMarchandise);
+  if (!Number.isInteger(montantMarchandise) || montantMarchandise < 0) {
+    return { ok: false, message: "Le montant de la marchandise doit être un nombre entier de FCFA." };
+  }
+  if (montantMarchandise > PLAFOND_MARCHANDISE) {
+    return {
+      ok: false,
+      message: `Le montant de la marchandise ne peut pas dépasser ${PLAFOND_MARCHANDISE.toLocaleString("fr-FR")} FCFA.`,
+    };
+  }
+
   const vehicule = texte(formData, "vehicule_requis");
   const dateSouhaitee = texte(formData, "date_souhaitee");
 
@@ -69,6 +88,10 @@ export async function creerCourse(_etat: EtatAction, formData: FormData): Promis
     ...(dateSouhaitee && versIsoGabon(dateSouhaitee)
       ? { date_souhaitee: versIsoGabon(dateSouhaitee) }
       : {}),
+    paiement: {
+      payeur,
+      ...(montantMarchandise > 0 ? { montant_marchandise: montantMarchandise } : {}),
+    },
   };
 
   const reponse = await appelerApi<ResultatTransmission>("/livraisons", {
@@ -77,7 +100,7 @@ export async function creerCourse(_etat: EtatAction, formData: FormData): Promis
   });
   if (!reponse.ok) {
     if (reponse.statut === 403) {
-      return { ok: false, message: "Complétez d'abord votre profil boutique." };
+      return { ok: false, message: "Complétez d'abord votre profil." };
     }
     return { ok: false, message: reponse.message };
   }

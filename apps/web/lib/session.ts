@@ -10,7 +10,7 @@ import {
 } from "@/lib/jeton";
 
 /**
- * Session de la boutique : le JWT de l'API, dans un cookie httpOnly.
+ * Session du client : le JWT de l'API, dans un cookie httpOnly.
  *
  * Le jeton n'est jamais exposé au JavaScript du navigateur — un script injecté
  * ne peut pas le lire. Tous les appels à l'API partent donc du serveur Next
@@ -37,31 +37,48 @@ export async function fermerSession(): Promise<void> {
 }
 
 /**
- * Session de boutique valide, ou `null` — sans rediriger. Pour les pages
+ * Session de client valide, ou `null` — sans rediriger. Pour les pages
  * publiques qui adaptent seulement leur menu : lecture optimiste, aucune
  * donnée n'en dépend.
  */
 export async function lireSessionOptimiste(): Promise<{ email: string } | null> {
   const charge = lireChargeJeton((await cookies()).get(NOM_COOKIE_SESSION)?.value);
-  if (!charge || jetonExpire(charge) || charge.role !== "BOUTIQUE") return null;
+  if (!charge || jetonExpire(charge) || charge.role !== "CLIENT") return null;
   return { email: charge.email };
 }
 
+/** Les deux rôles qui ont un espace dans ce site : client et administration. */
+export type RoleEspace = "CLIENT" | "ADMIN";
+
+/** L'espace d'accueil de chaque rôle, après la connexion. */
+export const ACCUEIL_PAR_ROLE: Record<RoleEspace, string> = { CLIENT: "/courses", ADMIN: "/admin" };
+
+export function estRoleEspace(role: string | undefined): role is RoleEspace {
+  return role === "CLIENT" || role === "ADMIN";
+}
+
 /**
- * Exige une session de boutique valide, sinon redirige.
+ * Exige une session valide du rôle de l'espace, sinon redirige.
  *
  * Mémoïsée par rendu (`cache`) : le layout et la page l'appellent tous deux
  * sans relire le cookie. Un jeton expiré ou d'un autre rôle passe par
  * `/deconnexion`, qui seul peut effacer le cookie depuis un rendu — sans quoi
  * `proxy.ts` renverrait aussitôt vers l'espace, en boucle.
+ *
+ * Sans rôle : n'importe lequel des deux, pour `appelerApi`. Ce n'est PAS une
+ * garde d'accès : chaque layout passe son rôle, et l'API refait le contrôle.
  */
-export const exigerSession = cache(async () => {
+export const exigerSession = cache(async (role?: RoleEspace) => {
   const jeton = (await cookies()).get(NOM_COOKIE_SESSION)?.value;
   const charge = lireChargeJeton(jeton);
 
   if (!jeton || !charge) redirect("/connexion");
   if (jetonExpire(charge)) redirect("/deconnexion?motif=expiree");
-  if (charge.role !== "BOUTIQUE") redirect("/deconnexion?motif=role");
+  // Un jeton émis avant le 2026-10-23 porte encore le rôle BOUTIQUE : il passe
+  // par ici une fois, puis la reconnexion en délivre un nouveau.
+  if (!estRoleEspace(charge.role) || (role && charge.role !== role)) {
+    redirect("/deconnexion?motif=role");
+  }
 
-  return { jeton, email: charge.email };
+  return { jeton, email: charge.email, role: charge.role };
 });

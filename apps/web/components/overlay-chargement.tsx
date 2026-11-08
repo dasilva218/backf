@@ -25,8 +25,12 @@ export function OverlayChargement({
 
   useEffect(() => {
     if (visible) {
-      setAffiche(true);
-      setDepuis(Date.now());
+      // Seulement à l'apparition : `depuis` est une dépendance, le réécrire à
+      // chaque passage relancerait l'effet sans fin.
+      if (!affiche) {
+        setAffiche(true);
+        setDepuis(Date.now());
+      }
       return;
     }
     if (!affiche) return;

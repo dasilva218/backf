@@ -13,15 +13,16 @@ model User {
   emailVerified   Boolean         @default(false)
   status          AccountStatus   @default(ACTIVE)
   image           String?
-  role            UserRole        @default(BOUTIQUE)
+  role            UserRole        @default(CLIENT)
   password        String
   adminProfile    Admin?
-  boutiqueProfile Boutique?
+  clientProfile   Client?
   livreurProfile  Livreur?
   notifications   Notification[]
   supportTickets  SupportTicket[]
   accounts        Account[]
   sessions        Session[]
+  reglementsSaisis MouvementEspeces[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -43,22 +44,31 @@ model Admin {
   transactions Transaction[]
 }
 
-model Boutique {
+/// Celui qui commande une course : particulier, entreprise ou boutique.
+///
+/// Une boutique n'est qu'un type de client parmi d'autres (décision du
+/// 2026-10-23). `firstname` / `lastname` désignent la personne à contacter ;
+/// `raisonSociale` le nom de l'entreprise ou de la boutique, obligatoire pour
+/// ces deux types (contrôlé par le DTO, pas en base).
+model Client {
   id                 String        @id @default(uuid())
+  type               TypeClient
+  raisonSociale      String?
   firstname          String
   lastname           String
   phoneAirtel        String?
   phoneMoov          String?
   address            String?
-  userBoutiqueId     String        @unique
+  userClientId       String        @unique
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
-  user               User          @relation(fields: [userBoutiqueId], references: [id], onDelete: Cascade)
+  user               User          @relation(fields: [userClientId], references: [id], onDelete: Cascade)
   documents          Document[]
   evaluationsDonnees Evaluation[]  @relation("EvaluationsDonnees")
   evaluations        Evaluation[]  @relation("EvaluationsRecues")
-  livraisonsSoumise  Livraison[]
+  livraisons         Livraison[]
   transactions       Transaction[]
+  mouvementsEspeces  MouvementEspeces[]
 }
 
 model Livreur {
@@ -75,7 +85,15 @@ model Livreur {
   ville              String?
   scoreGlobal        Float         @default(0)
   nombreLivraisons   Int           @default(0)
+  /// En service : il reçoit les annonces de courses. Basculé par le livreur.
   estDisponible      Boolean       @default(true)
+
+  /// Dossier vérifié par un ADMIN, pièces en main, au bureau (pas de dépôt de
+  /// fichiers au lancement). Aucune course n'est proposée ni acceptée avant
+  /// VALIDE : c'est la garde du KYC, comme `is_verified` chez Ewuang.
+  statutDossier      StatutDossier @default(EN_ATTENTE)
+  motifRefus         String?
+  dossierTraiteAt    DateTime?     @db.Timestamptz
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   documents          Document[]
@@ -85,6 +103,7 @@ model Livreur {
   livraisons         Livraison[]
   user               User          @relation(fields: [userLivreurId], references: [id], onDelete: Cascade)
   transactions       Transaction[]
+  mouvementsEspeces  MouvementEspeces[]
 
   @@index([userLivreurId])
   @@index([ville])
@@ -96,15 +115,15 @@ model Document {
   type       String
   url        String
   adminId    String?
-  boutiqueId String?
+  clientId   String?
   livreurId  String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   admin      Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  boutique   Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  client     Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   livreur    Livreur?  @relation(fields: [livreurId], references: [id], onDelete: Cascade)
 
-  @@index([boutiqueId])
+  @@index([clientId])
   @@index([adminId])
 }
 
@@ -124,7 +143,7 @@ model Colis {
 model Livraison {
   id         String  @id @default(cuid())
   livreurId  String?
-  boutiqueId String?
+  clientId   String?
 
   // ─── Rattachement à la mission Ewuang ────────────────────────────────────
   //
@@ -142,6 +161,11 @@ model Livraison {
   // l'appel a échoué doit rester visible et rejouable, pas disparaître.
   referenceExterne String? @unique
   missionEwuangId  String? @unique
+
+  /// Numéro court « AV-10427 », posé par la base (séquence) : c'est lui qu'on
+  /// affiche et qu'on dicte au téléphone. Ne remplace pas `referenceExterne`,
+  /// qui reste la clé d'idempotence d'Ewuang (migration numero_court).
+  numero String @unique @default(dbgenerated("('AV-'::text || nextval('\"Livraison_numero_seq\"'::regclass))"))
 
   /// Statut d'Ewuang, repris TEL QUEL : « En attente », « En cours de
   /// livraison », « Colis récupéré », « Livrée », « Annulée », « Reportée ».
@@ -181,7 +205,7 @@ model Livraison {
   // ─── L'argent de la course ───────────────────────────────────────────────
   //
   // Renvoyés par POST /partenaires/missions et stockés tels quels. `tarif`
-  // ci-dessous est ce que paie le vendeur ; `tarifEwuang` est ce que la course
+  // ci-dessous est ce que paie le client ; `tarifEwuang` est ce que la course
   // nous coûte. Sans les deux, la marge de l'activité n'est lisible d'aucun
   // côté.
   //
@@ -190,6 +214,62 @@ model Livraison {
   // la marge par soustraction.
   tarifEwuang         Int?
   remunerationLivreur Int?
+
+  /// Qui paie les frais, en espèces, au livreur : l'expéditeur à
+  /// l'enlèvement ou le destinataire à la remise. Choisi par le client à la
+  /// commande et exigé par l'API pour toute nouvelle course.
+  ///
+  /// Null = course réglée hors course : ce sont les courses créées avant le
+  /// paiement en espèces (2026-10-23). Même sens qu'un bloc `paiement` absent
+  /// dans la v2 du contrat Ewuang.
+  payeur Payeur?
+
+  /// Contre-remboursement : prix de la marchandise que le livreur encaisse
+  /// auprès du DESTINATAIRE, à la remise, pour le compte du client. 0 = aucun.
+  /// Ce n'est pas un revenu de find_delivery : il est dû au client. CHECK en
+  /// base : positif, et jamais sans `payeur`.
+  montantMarchandise Int @default(0)
+
+  // ─── La flotte qui exécute la course ─────────────────────────────────────
+  //
+  // La course est proposée en même temps à la flotte find_delivery et à
+  // Ewuang ; la première qui l'obtient la garde. `flotte` ne passe de null à
+  // une valeur QUE par une mise à jour conditionnée par `flotte: null` : c'est
+  // le verrou qui empêche deux livreurs sur une même course.
+  //
+  // FIND_DELIVERY : `statut` fait foi, et les événements d'Ewuang sur cette
+  // mission (son annulation, d'abord) sont ignorés. EWUANG : `statutEwuang`
+  // fait foi, comme avant.
+  flotte Flotte?
+
+  /// Réservation accordée à un livreur Ewuang (v2 du contrat, §1), qui pose
+  /// `flotte = EWUANG` avant même l'attribution. Confirmée par
+  /// `mission.attribuee` (`dateAcceptation`) ; sans elle au bout de 10 min, la
+  /// course redevient libre (src/livraisons/flotte.ts). Null hors réservation.
+  reserveeEwuangAt DateTime? @db.Timestamptz
+
+  /// Essais du code de remise, consommés AVANT la comparaison (voir
+  /// livreur-courses.service.ts). Au 5e, seul un ADMIN clôture la course.
+  tentativesCode Int @default(0)
+
+  /// Arrivée du livreur chez le destinataire. Ouvre, 10 min plus tard, le
+  /// droit de déclarer un échec de remise (règle R3).
+  arriveeDestinationAt DateTime? @db.Timestamptz
+
+  /// Espèces que le livreur déclare avoir reçues, à chaque étape où quelque
+  /// chose est dû. Montant exact exigé (règle R2 : pas de paiement partiel).
+  /// Chacun a son écriture ENCAISSEMENT dans `MouvementEspeces`.
+  montantEncaisseEnlevement Int?
+  encaisseEnlevementAt      DateTime? @db.Timestamptz
+  montantEncaisseRemise     Int?
+  encaisseRemiseAt          DateTime? @db.Timestamptz
+
+  /// Colis rendu à l'expéditeur après un échec de remise (statut RETOURNEE).
+  /// Si le destinataire devait payer les frais, l'expéditeur les doit alors
+  /// (règle R3) : ils sont encaissés à ce moment-là.
+  dateRetour            DateTime? @db.Timestamptz
+  montantEncaisseRetour Int?
+  encaisseRetourAt      DateTime? @db.Timestamptz
 
   /// `emis_at` du dernier événement appliqué à cette mission.
   ///
@@ -205,7 +285,7 @@ model Livraison {
   /// schéma doit porter cette annotation.
   dernierEvenementAt DateTime? @db.Timestamptz
 
-  // ─── La demande de la boutique ───────────────────────────────────────────
+  // ─── La demande du client ────────────────────────────────────────────────
   //
   // La zone d'arrivée et le type fixent notre prix (`tarif`) ; le départ est
   // conservé mais n'entre pas dans le prix. Le contrat Ewuang ne connaît
@@ -220,7 +300,7 @@ model Livraison {
   /// Ewuang est idempotent sur `reference_externe`, mais seulement à corps
   /// identique : un corps différent répond 409. Rejouer après un timeout exige
   /// donc de renvoyer ce corps-ci, pas de le reconstruire depuis les colonnes
-  /// (un profil boutique modifié entre-temps changerait le contact d'enlèvement).
+  /// (un profil client modifié entre-temps changerait le contact d'enlèvement).
   chargeEwuang Json?
 
   /// Dernier refus ou échec de transmission à Ewuang. Null quand la mission est
@@ -243,23 +323,25 @@ model Livraison {
   dateRecuperation DateTime?
   dateLivraison    DateTime?
   dateAnnulation   DateTime?
-  noteBoutique     String?
+  noteClient       String?
   noteLivreur      String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   colis            Colis[]
   evaluation       Evaluation?
-  boutique         Boutique?       @relation(fields: [boutiqueId], references: [id])
+  client           Client?         @relation(fields: [clientId], references: [id])
   livreur          Livreur?        @relation(fields: [livreurId], references: [id])
   suivisPosition   SuiviPosition[]
   transactions     Transaction[]
+  mouvementsEspeces MouvementEspeces[]
 
-  @@index([boutiqueId])
+  @@index([clientId])
   @@index([livreurId])
   @@index([statut])
   @@index([dateDemande])
   @@index([statutEwuang])
   @@index([livreurEwuangId])
+  @@index([flotte])
 }
 
 /// Journal des webhooks reçus d'Ewuang.
@@ -336,29 +418,29 @@ model Evaluation {
   livraisonId             String    @unique
   noteVersLivreur         Int?
   commentaireVersLivreur  String?
-  noteVersBoutique        Int?
-  commentaireVersBoutique String?
+  noteVersClient          Int?
+  commentaireVersClient   String?
   livreurEvaluateurId     String?
   livreurEvalueId         String?
-  boutiqueEvaluateurId    String?
-  boutiqueEvalueId        String?
+  clientEvaluateurId      String?
+  clientEvalueId          String?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
-  boutiqueEvaluateur      Boutique? @relation("EvaluationsDonnees", fields: [boutiqueEvaluateurId], references: [id])
-  boutiqueEvalue          Boutique? @relation("EvaluationsRecues", fields: [boutiqueEvalueId], references: [id])
+  clientEvaluateur        Client?   @relation("EvaluationsDonnees", fields: [clientEvaluateurId], references: [id])
+  clientEvalue            Client?   @relation("EvaluationsRecues", fields: [clientEvalueId], references: [id])
   livraison               Livraison @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
   livreurEvaluateur       Livreur?  @relation("EvaluationsDonnees", fields: [livreurEvaluateurId], references: [id])
   livreurEvalue           Livreur?  @relation("EvaluationsRecues", fields: [livreurEvalueId], references: [id])
 
   @@index([livraisonId])
   @@index([livreurEvalueId])
-  @@index([boutiqueEvalueId])
+  @@index([clientEvalueId])
 }
 
 model Transaction {
   id               String            @id @default(cuid())
   livraisonId      String?
-  boutiqueId       String?
+  clientId         String?
   livreurId        String?
   adminId          String?
   type             TypeTransaction
@@ -371,15 +453,60 @@ model Transaction {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   admin            Admin?            @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  boutique         Boutique?         @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  client           Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   livraison        Livraison?        @relation(fields: [livraisonId], references: [id], onDelete: Cascade)
   livreur          Livreur?          @relation(fields: [livreurId], references: [id], onDelete: Cascade)
 
   @@index([livraisonId])
-  @@index([boutiqueId])
+  @@index([clientId])
   @@index([livreurId])
   @@index([statut])
   @@index([createdAt])
+}
+
+/// Registre des espèces (phase 3) : qui doit combien à qui.
+///
+/// Une écriture par mouvement, jamais modifiée ni supprimée (trigger en base) :
+/// une erreur de saisie se corrige par l'écriture inverse. `montant` est
+/// toujours positif ; le sens se lit dans `type` (src/especes/especes.ts).
+///
+/// Deux comptes seulement, car find_delivery est la contrepartie de tout :
+/// - LIVREUR (ENCAISSEMENT, REMUNERATION, VERSEMENT, PAIEMENT_LIVREUR) : solde
+///   positif = espèces qu'il détient pour find_delivery ; négatif =
+///   find_delivery lui doit de l'argent (un retour coûte plus que la course).
+/// - CLIENT (MARCHANDISE, REVERSEMENT) : contre-remboursement encaissé pour lui
+///   et pas encore reversé.
+/// - EWUANG (ENCAISSEMENT_EWUANG, TARIF_EWUANG, REGLEMENT_EWUANG_*), ni livreur
+///   ni client : solde positif = Ewuang nous doit (ses livreurs ont encaissé
+///   plus que ce que nos courses lui coûtent).
+/// La commission de find_delivery n'a pas de compte : c'est `Livraison.commission`.
+///
+/// Les écritures d'une course sont posées dans la MÊME transaction que l'étape
+/// qui les cause ; `cle` unique (`<livraisonId>:<etape>`) en est le filet.
+model MouvementEspeces {
+  id          String               @id @default(cuid())
+  type        TypeMouvementEspeces
+  montant     Int
+  livreurId   String?
+  clientId    String?
+  livraisonId String?
+  /// `<livraisonId>:<etape>` pour une course ; `recu:<numéro>` pour un
+  /// règlement saisi par un ADMIN, le numéro du reçu papier.
+  cle         String               @unique
+  /// L'ADMIN qui a saisi un règlement. Null pour une écriture de course.
+  saisiParId  String?
+  note        String?
+  createdAt   DateTime             @default(now()) @db.Timestamptz
+  // Restrict : un livreur, un client ou une course qui a mouvementé de
+  // l'argent ne se supprime pas, l'historique de caisse disparaîtrait avec.
+  livreur     Livreur?             @relation(fields: [livreurId], references: [id], onDelete: Restrict)
+  client      Client?              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  livraison   Livraison?           @relation(fields: [livraisonId], references: [id], onDelete: Restrict)
+  saisiPar    User?                @relation(fields: [saisiParId], references: [id], onDelete: Restrict)
+
+  @@index([livreurId, createdAt])
+  @@index([clientId, createdAt])
+  @@index([livraisonId])
 }
 
 model Gain {
@@ -471,9 +598,31 @@ model Verification {
 }
 
 enum UserRole {
-  BOUTIQUE
+  CLIENT
   LIVREUR
   ADMIN
+}
+
+enum TypeClient {
+  PARTICULIER
+  ENTREPRISE
+  BOUTIQUE
+}
+
+enum Payeur {
+  EXPEDITEUR
+  DESTINATAIRE
+}
+
+enum Flotte {
+  FIND_DELIVERY
+  EWUANG
+}
+
+enum StatutDossier {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
 }
 
 enum TransportMode {
@@ -519,6 +668,10 @@ enum PrioriteTicket {
   URGENTE
 }
 
+/// Pour la flotte find_delivery : EN_ATTENTE → ACCEPTEE (livreur attribué) →
+/// EN_COURS (colis récupéré) → LIVREE, ou EN_COURS → RETOUR_EXPEDITEUR →
+/// RETOURNEE après un échec de remise (règle R3). Transitions dans
+/// livreur-courses.service.ts.
 enum StatutLivraison {
   EN_ATTENTE
   ACCEPTEE
@@ -526,6 +679,8 @@ enum StatutLivraison {
   LIVREE
   ANNULEE
   EN_LITIGE
+  RETOUR_EXPEDITEUR
+  RETOURNEE
 }
 
 enum TypeColis {
@@ -535,6 +690,31 @@ enum TypeColis {
   GROS_COLIS
   FRAGILE
   ALIMENTAIRE
+}
+
+enum TypeMouvementEspeces {
+  /// Livreur : espèces reçues à une étape de course (frais et marchandise).
+  ENCAISSEMENT
+  /// Livreur : sa part de la course, qu'il garde. Posée à la fin (LIVREE ou RETOURNEE).
+  REMUNERATION
+  /// Livreur → find_delivery, contre un reçu.
+  VERSEMENT
+  /// find_delivery → livreur, quand son solde est négatif.
+  PAIEMENT_LIVREUR
+  /// Client : contre-remboursement encaissé pour lui à la remise.
+  MARCHANDISE
+  /// find_delivery → client.
+  REVERSEMENT
+  /// Ewuang : espèces encaissées par un de ses livreurs sur une de nos courses
+  /// (webhook v2). Ewuang en répond devant nous (R7).
+  ENCAISSEMENT_EWUANG
+  /// Ewuang : ce que la course nous coûte chez lui (`tarifEwuang`, + forfait
+  /// retour sur un retour). Il le garde sur ce qu'il a encaissé.
+  TARIF_EWUANG
+  /// Ewuang → find_delivery, au règlement du relevé, contre un reçu.
+  REGLEMENT_EWUANG_RECU
+  /// find_delivery → Ewuang, quand le relevé est en sa faveur.
+  REGLEMENT_EWUANG_VERSE
 }
 
 enum TypeTransaction {

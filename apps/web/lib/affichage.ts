@@ -1,4 +1,4 @@
-import type { Livraison, TypeCourse } from "@/lib/types";
+import type { Livraison, Payeur, TypeClient, TypeCourse } from "@/lib/types";
 
 /**
  * Libellés et formats d'affichage, partagés par les écrans serveur et client.
@@ -37,6 +37,32 @@ export const DESCRIPTIONS_TYPE: Record<TypeCourse, string> = {
   volumineux: "Colis encombrant ou lourd",
 };
 
+export const LIBELLES_TYPE_CLIENT: Record<TypeClient, string> = {
+  PARTICULIER: "Particulier",
+  ENTREPRISE: "Entreprise",
+  BOUTIQUE: "Boutique",
+};
+
+export interface Encaissements {
+  /** Payé par l'expéditeur au livreur, à l'enlèvement. */
+  enlevement: number;
+  /** Payé par le destinataire au livreur, à la remise. */
+  remise: number;
+}
+
+/**
+ * Ce que le livreur encaisse, et à quel moment.
+ *
+ * Les frais sont payés par le payeur choisi ; la marchandise l'est toujours
+ * par le destinataire, à la remise (v2 du contrat Ewuang, §2). Même calcul que
+ * `a_encaisser_enlevement` / `a_encaisser_remise` côté Ewuang.
+ */
+export function calculerEncaissements(tarif: number, payeur: Payeur, montantMarchandise: number): Encaissements {
+  return payeur === "EXPEDITEUR"
+    ? { enlevement: tarif, remise: montantMarchandise }
+    : { enlevement: 0, remise: tarif + montantMarchandise };
+}
+
 export type TonStatut = "attente" | "cours" | "recupere" | "livree" | "alerte" | "annulee";
 
 export interface StatutAffiche {
@@ -44,21 +70,46 @@ export interface StatutAffiche {
   ton: TonStatut;
 }
 
+/** Le statut d'une course prise par un livreur find_delivery, où `statut` fait foi. */
+const STATUT_FLOTTE_FIND_DELIVERY: Partial<Record<Livraison["statut"], StatutAffiche>> = {
+  ACCEPTEE: { libelle: "Livreur en route", ton: "cours" },
+  EN_COURS: { libelle: "Colis récupéré", ton: "recupere" },
+  LIVREE: { libelle: "Livrée", ton: "livree" },
+  RETOUR_EXPEDITEUR: { libelle: "Retour à l'expéditeur", ton: "alerte" },
+  RETOURNEE: { libelle: "Rendue à l'expéditeur", ton: "annulee" },
+  EN_LITIGE: { libelle: "En litige", ton: "alerte" },
+};
+
 /**
- * Le statut montré à la boutique.
+ * Le statut montré au client.
  *
- * Le statut d'Ewuang fait foi dès que la course lui a été transmise. Avant
- * cela, deux cas propres à find_delivery : « Non transmise » (Ewuang
- * injoignable, à renvoyer) et « Annulée » (annulée ou refusée par Ewuang).
+ * Qui fait foi dépend de la flotte qui a la course. Un livreur find_delivery :
+ * `statut`. Un livreur Ewuang, ou personne encore : le statut d'Ewuang. Avant
+ * la transmission, deux cas propres à find_delivery : « Non transmise »
+ * (Ewuang injoignable, à renvoyer) et « Annulée » (annulée ou refusée).
+ *
+ * Une mission « Annulée » chez Ewuang n'annule PAS la course quand aucune
+ * flotte ne l'a : elle a pu être retirée chez Ewuang par un livreur
+ * find_delivery qui l'a ensuite rendue, et reste ouverte à notre flotte.
  */
-export function statutAffiche(livraison: Pick<Livraison, "statut" | "statutEwuang" | "missionEwuangId">): StatutAffiche {
-  if (livraison.statut === "ANNULEE" || livraison.statutEwuang === "Annulée") {
+export function statutAffiche(
+  livraison: Pick<Livraison, "statut" | "statutEwuang" | "missionEwuangId" | "flotte">,
+): StatutAffiche {
+  if (livraison.statut === "ANNULEE") {
     return { libelle: "Annulée", ton: "annulee" };
+  }
+  if (livraison.flotte === "FIND_DELIVERY") {
+    return STATUT_FLOTTE_FIND_DELIVERY[livraison.statut] ?? { libelle: "En attente d'un livreur", ton: "attente" };
   }
   if (!livraison.missionEwuangId) {
     return { libelle: "Non transmise", ton: "alerte" };
   }
+  if (livraison.flotte === null && livraison.statutEwuang === "Annulée") {
+    return { libelle: "En attente d'un livreur", ton: "attente" };
+  }
   switch (livraison.statutEwuang) {
+    case "Annulée":
+      return { libelle: "Annulée", ton: "annulee" };
     case "En cours de livraison":
       return { libelle: "Livreur en route", ton: "cours" };
     case "Colis récupéré":
@@ -67,6 +118,11 @@ export function statutAffiche(livraison: Pick<Livraison, "statut" | "statutEwuan
       return { libelle: "Livrée", ton: "livree" };
     case "Reportée":
       return { libelle: "Reportée", ton: "alerte" };
+    // v2 du contrat Ewuang, §3 : mêmes libellés que pour notre flotte.
+    case "Retour expéditeur":
+      return { libelle: "Retour à l'expéditeur", ton: "alerte" };
+    case "Retournée":
+      return { libelle: "Rendue à l'expéditeur", ton: "annulee" };
     case "En attente":
     case null:
       return { libelle: "En attente d'un livreur", ton: "attente" };
@@ -77,10 +133,30 @@ export function statutAffiche(livraison: Pick<Livraison, "statut" | "statutEwuan
   }
 }
 
-/** Ewuang refuse l'annulation une fois le colis récupéré. */
-export function estAnnulable(livraison: Pick<Livraison, "statut" | "statutEwuang">): boolean {
+/** Annulable tant que le colis n'est pas récupéré, quelle que soit la flotte (R4). */
+export function estAnnulable(livraison: Pick<Livraison, "statut" | "statutEwuang" | "flotte">): boolean {
   if (livraison.statut === "ANNULEE") return false;
-  return !["Annulée", "Livrée", "Colis récupéré"].includes(livraison.statutEwuang ?? "");
+  if (livraison.flotte === "FIND_DELIVERY") {
+    return livraison.statut === "ACCEPTEE";
+  }
+  if (livraison.flotte === null && livraison.statutEwuang === "Annulée") return true;
+  return !["Annulée", "Livrée", "Colis récupéré", "Retour expéditeur", "Retournée"].includes(
+    livraison.statutEwuang ?? "",
+  );
+}
+
+/**
+ * Un livreur a le colis en main : la fiche affiche sa position en direct.
+ * Miroir de `estEnCours` (apps/api/src/suivi/suivi.ts), qui seul fait foi.
+ */
+export function estSuivable(livraison: Pick<Livraison, "statut" | "statutEwuang" | "flotte">): boolean {
+  if (livraison.flotte === "FIND_DELIVERY") {
+    return ["ACCEPTEE", "EN_COURS", "RETOUR_EXPEDITEUR"].includes(livraison.statut);
+  }
+  if (livraison.flotte === "EWUANG") {
+    return ["En cours de livraison", "Colis récupéré", "Retour expéditeur"].includes(livraison.statutEwuang ?? "");
+  }
+  return false;
 }
 
 export function estARenvoyer(livraison: Pick<Livraison, "statut" | "missionEwuangId">): boolean {

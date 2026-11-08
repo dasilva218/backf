@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { appelerApi } from "@/lib/api";
 import {
+  calculerEncaissements,
   estAnnulable,
   estARenvoyer,
+  estSuivable,
   formaterDate,
   formaterMontant,
   LIBELLES_TYPE,
 } from "@/lib/affichage";
 import type { LivraisonDetail } from "@/lib/types";
 import { ActionsCourse } from "./actions";
+import { SuiviLivreur } from "./suivi-livreur";
 
 export const metadata: Metadata = { title: "Course" };
 
@@ -40,12 +43,21 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
   const course = reponse.donnees;
   const charge = course.chargeEwuang;
   const annulee = course.statut === "ANNULEE";
+  // Null pour une course réglée hors course (créée avant le paiement en espèces).
+  const encaissements =
+    course.payeur && course.tarif != null
+      ? calculerEncaissements(course.tarif, course.payeur, course.montantMarchandise)
+      : null;
 
   const etapes = [
     { libelle: "Demandée", date: course.dateDemande },
     { libelle: "Acceptée par un livreur", date: course.dateAcceptation },
     { libelle: "Colis récupéré", date: course.dateRecuperation },
-    { libelle: "Livrée", date: course.dateLivraison },
+    // Un colis revenu à l'expéditeur n'a jamais été livré : l'étape cède la
+    // place au retour.
+    ...(course.dateRetour
+      ? [{ libelle: "Rendu à l'expéditeur", date: course.dateRetour }]
+      : [{ libelle: "Livrée", date: course.dateLivraison }]),
     ...(course.dateAnnulation ? [{ libelle: "Annulée", date: course.dateAnnulation }] : []),
   ];
 
@@ -121,6 +133,8 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
         </Card>
       )}
 
+      {estSuivable(course) && <SuiviLivreur id={course.id} livreurNom={course.livreurNom} />}
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -150,6 +164,27 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
             {charge?.date_souhaitee && (
               <Bloc titre="Date souhaitée">
                 <p>{formaterDate(charge.date_souhaitee)}</p>
+              </Bloc>
+            )}
+            {encaissements && (
+              <Bloc titre="Paiement en espèces, au livreur">
+                {encaissements.enlevement > 0 && (
+                  <p>
+                    {formaterMontant(encaissements.enlevement)} par l&apos;expéditeur, à l&apos;enlèvement
+                  </p>
+                )}
+                {encaissements.remise > 0 && (
+                  <p>
+                    {formaterMontant(encaissements.remise)} par le destinataire, à la remise
+                    {course.montantMarchandise > 0 && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        (dont {formaterMontant(course.montantMarchandise)} pour la marchandise, que nous vous
+                        reversons)
+                      </span>
+                    )}
+                  </p>
+                )}
               </Bloc>
             )}
           </CardContent>
@@ -207,7 +242,9 @@ export default async function PageCourse({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">Référence : {course.referenceExterne ?? course.id}</p>
+      <p className="text-xs text-muted-foreground">
+        Numéro de course : <span className="font-medium text-foreground">{course.numero}</span>
+      </p>
     </div>
   );
 }

@@ -3,34 +3,34 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
-import { BoutiquesService } from './boutiques.service.js';
-import { ProfilBoutiqueDto } from './profil-boutique.dto.js';
+import { ClientsService } from './clients.service.js';
+import { ProfilClientDto } from './profil-client.dto.js';
 
-@ApiTags('Boutiques')
-@Roles(UserRole.BOUTIQUE)
-@Controller('boutiques')
-export class BoutiquesController {
-    constructor(private readonly boutiques: BoutiquesService) { }
+@ApiTags('Clients')
+@Roles(UserRole.CLIENT)
+@Controller('clients')
+export class ClientsController {
+    constructor(private readonly clients: ClientsService) { }
 
     @Get('moi')
-    @ApiOperation({ summary: 'Profil de la boutique connectée' })
-    @ApiResponse({ status: 200, description: 'Profil boutique.' })
+    @ApiOperation({ summary: 'Profil du client connecté' })
+    @ApiResponse({ status: 200, description: 'Profil client.' })
     @ApiResponse({ status: 404, description: 'Profil pas encore renseigné.' })
     lire(@CurrentUser() user: Omit<User, 'password'>) {
-        return this.boutiques.lireProfil(user.id);
+        return this.clients.lireProfil(user.id);
     }
 
     @Put('moi')
     @ApiOperation({
-        summary: 'Crée ou met à jour le profil de la boutique connectée',
+        summary: 'Crée ou met à jour le profil du client connecté',
         description: 'Obligatoire avant de soumettre une course.',
     })
     @ApiResponse({ status: 200, description: 'Profil enregistré.' })
     @ApiResponse({ status: 400, description: 'Erreur de validation.' })
     enregistrer(
         @CurrentUser() user: Omit<User, 'password'>,
-        @Body() dto: ProfilBoutiqueDto,
+        @Body() dto: ProfilClientDto,
     ) {
-        return this.boutiques.enregistrerProfil(user.id, dto);
+        return this.clients.enregistrerProfil(user.id, dto);
     }
 }

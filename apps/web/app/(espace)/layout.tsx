@@ -7,13 +7,13 @@ import { exigerSession } from "@/lib/session";
 import { NavigationEspace } from "./navigation";
 
 export default async function LayoutEspace({ children }: { children: React.ReactNode }) {
-  const { email } = await exigerSession();
+  const { email } = await exigerSession("CLIENT");
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link href="/courses" aria-label="Accueil find_delivery">
+          <Link href="/courses" aria-label="Accueil Avoo">
             <Logo />
           </Link>
           <NavigationEspace />

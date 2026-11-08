@@ -1,6 +1,7 @@
 "use client";
 
 import { seConnecter } from "@/app/actions/auth";
+import { ChampMotDePasse } from "@/components/champ-mot-de-passe";
 import { OverlayChargement } from "@/components/overlay-chargement";
 import { useFormulaireAction } from "@/components/use-retour-action";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ export function FormulaireConnexion() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Mot de passe</Label>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <ChampMotDePasse id="password" name="password" autoComplete="current-password" required />
       </div>
       <Button type="submit" disabled={enCours} className="mt-2">
         Se connecter
